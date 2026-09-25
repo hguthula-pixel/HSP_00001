@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>SPATIALIS — Architectural WebXR Platform</title>
+  
+  <!-- Modern Architectural Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-base: #0a0b0d;
+      --surface-panel: rgba(18, 20, 24, 0.88);
+      --surface-elevated: #16181d;
+      --border-subtle: #24272e;
+      --border-focus: #3d424d;
+      --text-main: #f3f4f6;
+      --text-muted: #8a919e;
+      --accent: #e25a38; /* Tectonic Terracotta */
+      --accent-hover: #f07152;
+      --accent-active: #c44627;
+      --radius-sm: 2px;
+      --radius-md: 4px;
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #webgl-canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #webgl-canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* Architectural UI Overlay */
+    .hud-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .brand-mark {
+      background: var(--surface-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      padding: 12px 18px;
+      border-radius: var(--radius-sm);
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-indicator {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .project-name {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .action-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--surface-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 10px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn:hover {
+      border-color: var(--border-focus);
+      background: var(--surface-elevated);
+    }
+
+    .btn-vr {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-vr:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .btn-vr:disabled {
+      background: #2a2d34;
+      border-color: #2a2d34;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    /* Hotspot Annotation Drawer */
+    .annotation-panel {
+      position: absolute;
+      top: 90px;
+      right: 24px;
+      width: 320px;
+      background: var(--surface-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      padding: 20px;
+      border-radius: var(--radius-sm);
+      transform: translateX(360px);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .annotation-panel.active {
+      transform: translateX(0);
+    }
+
+    .annotation-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .annotation-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .annotation-body {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    /* Bottom Scene Selector */
+    .bottom-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+    }
+
+    .scene-reel {
+      background: var(--surface-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      gap: 8px;
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .scene-reel::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scene-node {
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.15s ease;
+    }
+
+    .scene-node:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .scene-node.active {
+      color: var(--text-main);
+      border-color: var(--border-focus);
+      background: var(--surface-elevated);
+    }
+
+    .scene-id {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+    }
+
+    .scene-name {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    /* Loading Veil */
+    #loader {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-base);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      transition: opacity 0.4s ease;
+    }
+
+    #loader.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border-subtle);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* File drop styling for local Enscape testing */
+    #drop-zone-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 11, 13, 0.9);
+      border: 2px dashed var(--accent);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-main);
+    }
+
+    @media (max-width: 768px) {
+      .hud-layer { padding: 16px; }
+      .project-name { display: none; }
+      .annotation-panel { width: calc(100% - 32px); right: 16px; top: auto; bottom: 120px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading State -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <div style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text-muted);">
+      INITIALIZING WEBXR PIPELINE...
+    </div>
+  </div>
+
+  <!-- Drag-and-Drop Local Enscape Render Feedback -->
+  <div id="drop-zone-overlay">DROP EQUIRECTANGULAR PANORAMA TO VIEW</div>
+
+  <!-- Three.js Canvas Container -->
+  <div id="webgl-canvas-container"></div>
+
+  <!-- 2D Desktop / Mobile UI Layer -->
+  <div class="hud-layer">
+    <header class="top-bar">
+      <div class="brand-mark interactive">
+        <div class="brand-title">
+          <span class="brand-indicator"></span>
+          SPATIALIS
+        </div>
+        <div class="project-name" id="ui-project-label">POORNA MARKET REDEVELOPMENT</div>
+      </div>
+
+      <div class="action-group interactive">
+        <input type="file" id="local-file-input" accept="image/*" style="display: none;" />
+        <button class="btn" id="btn-upload" title="Test custom Enscape 360 Render">
+          <span>UPLOAD 360</span>
+        </button>
+        <button class="btn" id="btn-fullscreen">
+          <span>FULLSCREEN</span>
+        </button>
+        <button class="btn btn-vr" id="btn-webxr" disabled>
+          <span>CHECKING VR...</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Contextual Hotspot Note -->
+    <div class="annotation-panel interactive" id="annotation-card">
+      <div class="annotation-tag" id="anno-category">TECTONIC DETAIL</div>
+      <div class="annotation-title" id="anno-title">Exposed Truss Framework</div>
+      <div class="annotation-body" id="anno-desc">
+        Lightweight steel space-frame providing unobstructed floor clearance while respecting the 1935 original structural grid.
+      </div>
+    </div>
+
+    <!-- Scene Navigation Drawer -->
+    <footer class="bottom-bar">
+      <nav class="scene-reel interactive" id="scene-selector-container">
+        <!-- Rendered dynamically from project schema -->
+      </nav>
+    </footer>
+  </div>
+
+  <!-- Three.js + WebXR Bundles from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    /* =========================================================================
+       PROJECT SCHEMA & STATE DEFINITION
+       ========================================================================= */
+    const PROJECT_DATA = {
+      id: "poorna-market",
+      name: "Poorna Market Redevelopment",
+      location: "Visakhapatnam, India",
+      scenes: [
+        {
+          id: "01",
+          name: "Main Entrance",
+          zone: "Threshold & Colonnade",
+          color1: "#2B1E1A",
+          color2: "#0D0E12",
+          hotspots: [
+            { x: 30, y: 5, z: -40, title: "1935 Facade Preservation", category: "HERITAGE", desc: "Original stone masonry stabilized and framed by an open air colonnade." }
+          ]
+        },
+        {
+          id: "02",
+          name: "Central Market Street",
+          zone: "Primary Spine",
+          color1: "#1A222B",
+          color2: "#0A0B0E",
+          hotspots: [
+            { x: -35, y: 10, z: -35, title: "Ventilation Lanterns", category: "CLIMATE", desc: "Clerestory louvers inducing passive stack effect through the market hall." }
+          ]
+        },
+        {
+          id: "03",
+          name: "Puja Market",
+          zone: "Ritual & Flower Guild",
+          color1: "#2B281A",
+          color2: "#0C0D0F",
+          hotspots: [
+            { x: 0, y: -8, z: -45, title: "Basalt Basin", category: "MATERIAL", desc: "Locally sourced stone counters with continuous greywater catchment channels." }
+          ]
+        },
+        {
+          id: "04",
+          name: "Vegetable Market",
+          zone: "Perishable Goods Hall",
+          color1: "#1A2B20",
+          color2: "#0A0D0B",
+          hotspots: []
+        },
+        {
+          id: "05",
+          name: "Courtyard",
+          zone: "Public Realm",
+          color1: "#221A2B",
+          color2: "#0A0A0D",
+          hotspots: [
+            { x: 40, y: 15, z: 20, title: "Banyan Tree Core", category: "LANDSCAPE", desc: "Central gathering court planned around the historic banyan anchor." }
+          ]
+        }
+      ]
+    };
+
+    let activeSceneIndex = 0;
+
+    /* =========================================================================
+       PROCEDURAL EQUIRECTANGULAR GENERATOR
+       (Used as fallback prior to loading physical Enscape renders)
+       ========================================================================= */
+    function createProceduralPanorama(color1, color2, labelText) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 4096;
+      canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+
+      // Gradient background mimicking interior ambient light
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, color2);
+      grad.addColorStop(0.5, color1);
+      grad.addColorStop(1, color2);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Architectural Perspective Grid Lines
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 2;
+      for (let x = 0; x < canvas.width; x += 128) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 128) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Horizon line
+      ctx.strokeStyle = "rgba(226, 90, 56, 0.4)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height / 2);
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+
+      // Spatial Orientation Coordinates
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.font = "bold 64px 'Space Grotesk', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`NORTH // ${labelText.toUpperCase()}`, canvas.width * 0.25, canvas.height / 2 - 40);
+      ctx.fillText(`SOUTH // ${labelText.toUpperCase()}`, canvas.width * 0.75, canvas.height / 2 - 40);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.x = -1; // Invert horizontally to correct internal sphere mapping
+      return texture;
+    }
+
+    /* =========================================================================
+       THREE.JS CORE ARCHITECTURE
+       ========================================================================= */
+    const container = document.getElementById('webgl-canvas-container');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 0.1);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true; // WebXR core enabled
+    container.appendChild(renderer.domElement);
+
+    // Inverted 360° Sphere Geometry
+    const sphereGeometry = new THREE.SphereGeometry(100, 64, 40);
+    sphereGeometry.scale(-1, 1, 1); // Turn face normals inwards
+
+    const sphereMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+    const panoramaMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    scene.add(panoramaMesh);
+
+    // Hotspot Container Group
+    const hotspotGroup = new THREE.Group();
+    scene.add(hotspotGroup);
+
+    /* =========================================================================
+       CAMERA ORBIT & USER INTERACTION (DESKTOP / TOUCH)
+       ========================================================================= */
+    let isUserInteracting = false;
+    let onPointerDownMouseX = 0, onPointerDownMouseY = 0;
+    let lon = 0, onPointerDownLon = 0;
+    let lat = 0, onPointerDownLat = 0;
+    let phi = 0, theta = 0;
+
+    function bindOrbitControls() {
+      container.addEventListener('pointerdown', (e) => {
+        if (renderer.xr.isPresenting) return;
+        isUserInteracting = true;
+        onPointerDownMouseX = e.clientX;
+        onPointerDownMouseY = e.clientY;
+        onPointerDownLon = lon;
+        onPointerDownLat = lat;
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!isUserInteracting || renderer.xr.isPresenting) return;
+        lon = (onPointerDownMouseX - e.clientX) * 0.15 + onPointerDownLon;
+        lat = (e.clientY - onPointerDownMouseY) * 0.15 + onPointerDownLat;
+      });
+
+      window.addEventListener('pointerup', () => { isUserInteracting = false; });
+
+      // Field of View Wheel Zoom
+      container.addEventListener('wheel', (e) => {
+        if (renderer.xr.isPresenting) return;
+        camera.fov = Math.max(30, Math.min(90, camera.fov + e.deltaY * 0.05));
+        camera.updateProjectionMatrix();
+      });
+    }
+    bindOrbitControls();
+
+    /* =========================================================================
+       SCENE TRANSITIONS & TEXTURE MANAGEMENT
+       ========================================================================= */
+    function loadScene(index) {
+      activeSceneIndex = index;
+      const data = PROJECT_DATA.scenes[index];
+
+      // Update HUD Scene Nodes
+      document.querySelectorAll('.scene-node').forEach((node, i) => {
+        node.classList.toggle('active', i === index);
+      });
+
+      // Dismiss open annotation panel
+      document.getElementById('annotation-card').classList.remove('active');
+
+      // Texture Swap with Garbage Collection
+      if (sphereMaterial.map) sphereMaterial.map.dispose();
+      sphereMaterial.map = createProceduralPanorama(data.color1, data.color2, `${data.id} — ${data.name}`);
+      sphereMaterial.needsUpdate = true;
+
+      // Rebuild 3D Hotspot Markers in World Space
+      rebuildHotspots(data.hotspots);
+    }
+
+    function rebuildHotspots(hotspotList) {
+      while (hotspotGroup.children.length > 0) {
+        const obj = hotspotGroup.children[0];
+        obj.geometry.dispose();
+        obj.material.dispose();
+        hotspotGroup.remove(obj);
+      }
+
+      hotspotList.forEach(data => {
+        const geo = new THREE.RingGeometry(0.8, 1.2, 32);
+        const mat = new THREE.MeshBasicMaterial({ 
+          color: 0xe25a38, 
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85
+        });
+        const marker = new THREE.Mesh(geo, mat);
+        marker.position.set(data.x, data.y, data.z);
+        marker.lookAt(camera.position); // Always face central camera datum
+        marker.userData = data;
+        hotspotGroup.add(marker);
+      });
+    }
+
+    /* =========================================================================
+       RAYCASTING & INTERACTION (MOUSE & DESKTOP CLICKS)
+       ========================================================================= */
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    container.addEventListener('click', (e) => {
+      if (renderer.xr.isPresenting) return;
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+
+      const intersects = raycaster.intersectObjects(hotspotGroup.children);
+      if (intersects.length > 0) {
+        const hData = intersects[0].object.userData;
+        showAnnotation(hData);
+      }
+    });
+
+    function showAnnotation(data) {
+      document.getElementById('anno-category').innerText = data.category;
+      document.getElementById('anno-title').innerText = data.title;
+      document.getElementById('anno-desc').innerText = data.desc;
+      document.getElementById('annotation-card').classList.add('active');
+    }
+
+    /* =========================================================================
+       WEBXR & META QUEST SPECIFIC ARCHITECTURE
+       ========================================================================= */
+    const vrBtn = document.getElementById('btn-webxr');
+    let currentVRSession = null;
+
+    async function checkWebXRSupport() {
+      if ('xr' in navigator) {
+        const supported = await navigator.xr.isSessionSupported('immersive-vr');
+        if (supported) {
+          vrBtn.disabled = false;
+          vrBtn.innerHTML = "<span>ENTER VR</span>";
+          vrBtn.addEventListener('click', toggleVR);
+        } else {
+          vrBtn.innerHTML = "<span>VR UNAVAILABLE</span>";
+        }
+      } else {
+        vrBtn.innerHTML = "<span>NO WEBXR API</span>";
+      }
+    }
+
+    async function toggleVR() {
+      if (!currentVRSession) {
+        navigator.xr.requestSession('immersive-vr', {
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+        }).then(onVRSessionStarted);
+      } else {
+        currentVRSession.end();
+      }
+    }
+
+    function onVRSessionStarted(session) {
+      currentVRSession = session;
+      session.addEventListener('end', onVRSessionEnded);
+      renderer.xr.setSession(session);
+      vrBtn.innerHTML = "<span>EXIT VR</span>";
+      setupVRControllers();
+    }
+
+    function onVRSessionEnded() {
+      currentVRSession.removeEventListener('end', onVRSessionEnded);
+      currentVRSession = null;
+      vrBtn.innerHTML = "<span>ENTER VR</span>";
+    }
+
+    // Meta Quest Controllers & Spatial Ray Pointers
+    function setupVRControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+        
+        // Visual laser ray for Quest pointing
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -4)
+        ]);
+        const material = new THREE.LineBasicMaterial({ color: 0xe25a38, opacity: 0.7, transparent: true });
+        const line = new THREE.Line(geometry, material);
+        controller.add(line);
+
+        controller.addEventListener('selectstart', () => {
+          // Trigger Scene Advance in VR when pulling controller trigger
+          const nextIndex = (activeSceneIndex + 1) % PROJECT_DATA.scenes.length;
+          loadScene(nextIndex);
+        });
+
+        scene.add(controller);
+      }
+    }
+
+    /* =========================================================================
+       LOCAL FILE UPLOADER (ENSCAPE 360 TESTING)
+       ========================================================================= */
+    const uploadBtn = document.getElementById('btn-upload');
+    const fileInput = document.getElementById('local-file-input');
+
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadLocalImage(file);
+    });
+
+    // Drag-and-drop listener
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      document.getElementById('drop-zone-overlay').style.display = 'flex';
+    });
+    window.addEventListener('dragleave', (e) => {
+      if (e.relatedTarget === null) {
+        document.getElementById('drop-zone-overlay').style.display = 'none';
+      }
+    });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      document.getElementById('drop-zone-overlay').style.display = 'none';
+      if (e.dataTransfer.files.length > 0) {
+        loadLocalImage(e.dataTransfer.files[0]);
+      }
+    });
+
+    function loadLocalImage(file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          if (sphereMaterial.map) sphereMaterial.map.dispose();
+          const texture = new THREE.Texture(img);
+          texture.needsUpdate = true;
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.repeat.x = -1;
+          sphereMaterial.map = texture;
+          sphereMaterial.needsUpdate = true;
+          document.getElementById('ui-project-label').innerText = `CUSTOM ENSCAPE: ${file.name.toUpperCase()}`;
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /* =========================================================================
+       INITIALIZATION & ANIMATION RENDER LOOP
+       ========================================================================= */
+    function initUI() {
+      const container = document.getElementById('scene-selector-container');
+      PROJECT_DATA.scenes.forEach((sc, i) => {
+        const btn = document.createElement('button');
+        btn.className = `scene-node ${i === 0 ? 'active' : ''}`;
+        btn.innerHTML = `
+          <span class="scene-id">${sc.id}</span>
+          <span class="scene-name">${sc.name}</span>
+        `;
+        btn.onclick = () => loadScene(i);
+        container.appendChild(btn);
+      });
+
+      document.getElementById('btn-fullscreen').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Unified Three.js / WebXR Animation Loop
+    renderer.setAnimationLoop(() => {
+      if (!renderer.xr.isPresenting) {
+        // Clamp and update spherical orbit coordinates for desktop/mobile
+        lat = Math.max(-85, Math.min(85, lat));
+        phi = THREE.MathUtils.degToRad(90 - lat);
+        theta = THREE.MathUtils.degToRad(lon);
+
+        camera.target = new THREE.Vector3(
+          500 * Math.sin(phi) * Math.cos(theta),
+          500 * Math.cos(phi),
+          500 * Math.sin(phi) * Math.sin(theta)
+        );
+        camera.lookAt(camera.target);
+      }
+
+      // Billboard hotspots to face viewer
+      hotspotGroup.children.forEach(marker => {
+        marker.lookAt(camera.position);
+      });
+
+      renderer.render(scene, camera);
+    });
+
+    // Startup Sequence
+    window.addEventListener('DOMContentLoaded', () => {
+      initUI();
+      loadScene(0);
+      checkWebXRSupport();
+      setTimeout(() => {
+        document.getElementById('loader').classList.add('hidden');
+      }, 300);
+    });
+  </script>
+</body>
+</html>
