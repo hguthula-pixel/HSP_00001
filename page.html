@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>SPATIALIS — Meta Quest WebXR Controller System</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #090a0c;
+      --panel: rgba(16, 18, 22, 0.92);
+      --border: #22252c;
+      --accent: #e25a38;
+      --accent-hover: #f07152;
+      --text: #f0f2f5;
+      --text-muted: #838a96;
+      --font-display: 'Space Grotesk', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: 'Inter', sans-serif; color: var(--text); }
+    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+    /* Desktop Overlay HUD */
+    .hud {
+      position: absolute; inset: 0; z-index: 10; pointer-events: none;
+      display: flex; flex-direction: column; justify-content: space-between; padding: 24px;
+    }
+    .interactive { pointer-events: auto; }
+
+    .header-bar {
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .badge {
+      background: var(--panel); border: 1px solid var(--border); padding: 12px 18px;
+      backdrop-filter: blur(8px); border-radius: 2px;
+    }
+    .badge-title { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.15em; text-transform: uppercase; }
+    .badge-sub { font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-top: 4px; }
+
+    .btn-vr {
+      background: var(--accent); border: 1px solid var(--accent); color: #fff;
+      padding: 12px 20px; font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+      letter-spacing: 0.05em; border-radius: 2px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-vr:hover { background: var(--accent-hover); }
+    .btn-vr:disabled { background: #26282e; border-color: #26282e; color: #555; cursor: not-allowed; }
+
+    /* Quest Interaction Guide */
+    .vr-instruction-card {
+      background: var(--panel); border: 1px solid var(--border); padding: 16px;
+      border-radius: 2px; width: 340px; font-family: var(--font-mono); font-size: 11px;
+      line-height: 1.6; color: var(--text-muted); backdrop-filter: blur(8px);
+    }
+    .vr-instruction-card strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div class="hud">
+    <header class="header-bar">
+      <div class="badge interactive">
+        <div class="badge-title">SPATIALIS // VR CONTROLLER ENGINE</div>
+        <div class="badge-sub">META QUEST WEBXR INTERACTION SPEC</div>
+      </div>
+      <button class="btn-vr interactive" id="vr-btn" disabled>CHECKING WEBXR...</button>
+    </header>
+
+    <footer class="header-bar">
+      <div class="vr-instruction-card interactive">
+        <strong>QUEST CONTROLLER BINDINGS:</strong><br>
+        • <strong>Trigger:</strong> Select spatial target<br>
+        • <strong>Pointer Ray:</strong> Targets Spatial UI & Hotspots<br>
+        • <strong>A / X Button:</strong> Toggle Spatial UI menu<br>
+        • <strong>Thumbstick (Left/Right):</strong> 30° Snap turn
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    /* =========================================================================
+       PROJECT SCENE STATE
+       ========================================================================= */
+    const SCENES = [
+      { id: "01", name: "Main Colonnade", zone: "Threshold", bg1: "#2B1A17", bg2: "#0A0B0E" },
+      { id: "02", name: "Central Atrium", zone: "Circulation", bg1: "#17222B", bg2: "#0A0D12" },
+      { id: "03", name: "Courtyard Garden", zone: "Landscape", bg1: "#1A2B1D", bg2: "#090D0A" },
+      { id: "04", name: "Heritage Hall", zone: "Adaptive Reuse", bg1: "#261A2B", bg2: "#0B090E" }
+    ];
+
+    let currentSceneIdx = 0;
+    let vrMenuVisible = true;
+
+    /* =========================================================================
+       THREE.JS SYSTEM INITIALIZATION
+       ========================================================================= */
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    
+    // User Head Rig & Reference Frame
+    const userRig = new THREE.Group();
+    userRig.position.set(0, 0, 0);
+    scene.add(userRig);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.6, 0); // 1.6m standing human datum
+    userRig.add(camera);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // Panorama Inverted Sphere
+    const sphereGeo = new THREE.SphereGeometry(80, 64, 32);
+    sphereGeo.scale(-1, 1, 1);
+    const sphereMat = new THREE.MeshBasicMaterial();
+    const panoramaMesh = new THREE.Mesh(sphereGeo, sphereMat);
+    scene.add(panoramaMesh);
+
+    // Spatial Interaction Groups
+    const interactableObjects = []; // Target array for Raycaster
+    const spatialUIGroup = new THREE.Group();
+    scene.add(spatialUIGroup);
+
+    /* =========================================================================
+       PROCEDURAL ARCHITECTURAL PANORAMA GENERATOR
+       ========================================================================= */
+    function setPanorama(idx) {
+      currentSceneIdx = idx;
+      const s = SCENES[idx];
+      const canvas = document.createElement('canvas');
+      canvas.width = 4096; canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, s.bg2);
+      grad.addColorStop(0.5, s.bg1);
+      grad.addColorStop(1, s.bg2);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grid datum lines
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 2;
+      for (let x = 0; x < canvas.width; x += 128) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 128) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Orientation marker
+      ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+      ctx.font = "bold 64px 'Space Grotesk', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`SCENE ${s.id} // ${s.name.toUpperCase()} (${s.zone.toUpperCase()})`, canvas.width / 2, canvas.height / 2 - 30);
+
+      if (sphereMat.map) sphereMat.map.dispose();
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.x = -1;
+      sphereMat.map = texture;
+      sphereMat.needsUpdate = true;
+    }
+
+    /* =========================================================================
+       SPATIAL 3D VR INTERFACE (FLOATING CURVED SLATE)
+       ========================================================================= */
+    function createSpatialButtonTexture(text, sub, isHovered, isSelected) {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 160;
+      const ctx = c.getContext('2d');
+
+      // Surface fill
+      ctx.fillStyle = isSelected ? "#e25a38" : (isHovered ? "#22262f" : "#121418");
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      // Border outline
+      ctx.strokeStyle = isSelected ? "#ffffff" : (isHovered ? "#e25a38" : "#2e323b");
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, c.width - 6, c.height - 6);
+
+      // Scene Identifier
+      ctx.fillStyle = isSelected ? "#ffffff" : (isHovered ? "#e25a38" : "#838a96");
+      ctx.font = "bold 26px 'JetBrains Mono', monospace";
+      ctx.fillText(sub.toUpperCase(), 36, 50);
+
+      // Scene Title
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+      ctx.fillText(text.toUpperCase(), 36, 105);
+
+      // State Node
+      ctx.beginPath();
+      ctx.arc(460, 80, isSelected ? 12 : 8, 0, Math.PI * 2);
+      ctx.fillStyle = isSelected ? "#ffffff" : (isHovered ? "#e25a38" : "#2e323b");
+      ctx.fill();
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    function buildSpatialUI() {
+      // Clear existing UI elements
+      while (spatialUIGroup.children.length > 0) {
+        const obj = spatialUIGroup.children[0];
+        interactableObjects.splice(interactableObjects.indexOf(obj), 1);
+        obj.geometry.dispose();
+        if (obj.material.map) obj.material.map.dispose();
+        obj.material.dispose();
+        spatialUIGroup.remove(obj);
+      }
+
+      // Position: Centered, 1.8m in front of human view datum, slightly tilted upward
+      spatialUIGroup.position.set(0, 1.35, -1.8);
+      spatialUIGroup.rotation.x = -0.1; // -5.7 degrees upward tilt towards eyes
+
+      const cardGeo = new THREE.PlaneGeometry(0.5, 0.16);
+
+      SCENES.forEach((sceneData, i) => {
+        const isSelected = (i === currentSceneIdx);
+        const texture = createSpatialButtonTexture(sceneData.name, `0${i+1} // ${sceneData.zone}`, false, isSelected);
+        const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+        const mesh = new THREE.Mesh(cardGeo, mat);
+
+        // Curved radial layout around user coordinates
+        const angle = (i - (SCENES.length - 1) / 2) * 0.28; // Arc offset
+        mesh.position.x = Math.sin(angle) * 1.6;
+        mesh.position.z = (Math.cos(angle) * 1.6) - 1.6;
+        mesh.rotation.y = angle;
+
+        mesh.userData = {
+          type: 'scene_button',
+          index: i,
+          title: sceneData.name,
+          sub: `0${i+1} // ${sceneData.zone}`,
+          isHovered: false,
+          isSelected: isSelected,
+          updateState: function(hover, select) {
+            this.isHovered = hover;
+            this.isSelected = select;
+            this.mesh.material.map.dispose();
+            this.mesh.material.map = createSpatialButtonTexture(this.title, this.sub, hover, select);
+            this.mesh.material.needsUpdate = true;
+          }
+        };
+        mesh.userData.mesh = mesh;
+
+        spatialUIGroup.add(mesh);
+        interactableObjects.push(mesh);
+      });
+    }
+
+    /* =========================================================================
+       META QUEST WEBXR CONTROLLER & INTERACTION SYSTEM
+       ========================================================================= */
+    const controllers = [];
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+
+    function triggerHaptic(session, inputSource, duration = 12, intensity = 0.3) {
+      if (inputSource && inputSource.gamepad && inputSource.gamepad.hapticActuators && inputSource.gamepad.hapticActuators.length > 0) {
+        inputSource.gamepad.hapticActuators[0].pulse(intensity, duration);
+      }
+    }
+
+    function setupVRControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+        controller.userData.index = i;
+        controller.userData.hoveredObject = null;
+        userRig.add(controller);
+
+        // Dynamic Laser Ray
+        const beamGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -1) // Base length 1 unit, scaled dynamically
+        ]);
+        const beamMat = new THREE.LineBasicMaterial({
+          color: 0xe25a38,
+          transparent: true,
+          opacity: 0.6
+        });
+        const beamMesh = new THREE.Line(beamGeo, beamMat);
+        beamMesh.name = 'laser_beam';
+        controller.add(beamMesh);
+
+        // Hit Reticle at Ray Contact Point
+        const reticleGeo = new THREE.RingGeometry(0.008, 0.014, 32);
+        const reticleMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.9
+        });
+        const reticleMesh = new THREE.Mesh(reticleGeo, reticleMat);
+        reticleMesh.position.z = -1;
+        reticleMesh.name = 'reticle';
+        controller.add(reticleMesh);
+
+        // Primary Controller Trigger Down (Select Target)
+        controller.addEventListener('selectstart', (e) => {
+          const hovered = controller.userData.hoveredObject;
+          if (hovered && hovered.userData.type === 'scene_button') {
+            const nextIdx = hovered.userData.index;
+            setPanorama(nextIdx);
+            buildSpatialUI();
+
+            // Trigger strong haptic confirmation
+            const session = renderer.xr.getSession();
+            if (session && session.inputSources) {
+              triggerHaptic(session, session.inputSources[i], 35, 0.8);
+            }
+          }
+        });
+
+        controllers.push(controller);
+      }
+    }
+
+    /* =========================================================================
+       GAMEPAD INPUT POLLING (THUMBSTICKS & BUTTONS: A / B / X / Y)
+       ========================================================================= */
+    let snapTurnCooldown = false;
+
+    function handleGamepadInput() {
+      const session = renderer.xr.getSession();
+      if (!session) return;
+
+      session.inputSources.forEach((source, idx) => {
+        if (!source.gamepad) return;
+        const gp = source.gamepad;
+
+        // Snap Turn Check: Left / Right on Thumbstick (Axes 2 or 0 depending on profile)
+        const axisX = gp.axes.length >= 4 ? gp.axes[2] : gp.axes[0];
+        if (Math.abs(axisX) > 0.6 && !snapTurnCooldown) {
+          const turnAngle = (axisX > 0) ? -Math.PI / 6 : Math.PI / 6; // 30-degree discrete snap
+          userRig.rotation.y += turnAngle;
+          snapTurnCooldown = true;
+          triggerHaptic(session, source, 10, 0.2);
+          setTimeout(() => { snapTurnCooldown = false; }, 300); // 300ms lock to avoid spinning
+        }
+
+        // Toggle Spatial Menu: Buttons 4 or 5 (A/X buttons on Quest controllers)
+        const primaryBtnPressed = (gp.buttons[4] && gp.buttons[4].pressed) || (gp.buttons[5] && gp.buttons[5].pressed);
+        if (primaryBtnPressed && !source.userData_menuToggled) {
+          vrMenuVisible = !vrMenuVisible;
+          spatialUIGroup.visible = vrMenuVisible;
+          source.userData_menuToggled = true;
+          triggerHaptic(session, source, 20, 0.4);
+        } else if (!primaryBtnPressed) {
+          source.userData_menuToggled = false;
+        }
+      });
+    }
+
+    /* =========================================================================
+       SPATIAL RAYCASTING & DEPTH-CLAMPED RETICLE
+       ========================================================================= */
+    function updateControllerRays() {
+      if (!renderer.xr.isPresenting) return;
+
+      const session = renderer.xr.getSession();
+
+      controllers.forEach((controller) => {
+        const beam = controller.getObjectByName('laser_beam');
+        const reticle = controller.getObjectByName('reticle');
+        if (!beam || !reticle) return;
+
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+        let hitDist = 2.5; // Default beam length in empty space
+        let hitFound = false;
+
+        if (vrMenuVisible) {
+          const intersects = raycaster.intersectObjects(interactableObjects, false);
+
+          if (intersects.length > 0) {
+            const hit = intersects[0];
+            hitDist = hit.distance;
+            hitFound = true;
+
+            const targetObj = hit.object;
+            if (controller.userData.hoveredObject !== targetObj) {
+              // Unhover previous target
+              if (controller.userData.hoveredObject) {
+                controller.userData.hoveredObject.userData.updateState(false, controller.userData.hoveredObject.userData.isSelected);
+              }
+              // Hover current target
+              controller.userData.hoveredObject = targetObj;
+              targetObj.userData.updateState(true, targetObj.userData.isSelected);
+
+              // Subtle tactile tick upon entering bounding zone
+              if (session && session.inputSources) {
+                triggerHaptic(session, session.inputSources[controller.userData.index], 12, 0.25);
+              }
+            }
+          }
+        }
+
+        // Clear hover state when ray leaves interactive surface
+        if (!hitFound && controller.userData.hoveredObject) {
+          controller.userData.hoveredObject.userData.updateState(false, controller.userData.hoveredObject.userData.isSelected);
+          controller.userData.hoveredObject = null;
+        }
+
+        // Scale beam length and translate reticle to exact contact depth
+        beam.scale.set(1, 1, hitDist);
+        reticle.position.set(0, 0, -hitDist);
+        reticle.scale.setScalar(hitFound ? 1.4 : 1.0);
+        reticle.material.color.setHex(hitFound ? 0xe25a38 : 0xffffff);
+      });
+    }
+
+    /* =========================================================================
+       WEBXR BOOTSTRAPPER
+       ========================================================================= */
+    const vrBtn = document.getElementById('vr-btn');
+    let xrSession = null;
+
+    async function initWebXR() {
+      if ('xr' in navigator) {
+        const isSupported = await navigator.xr.isSessionSupported('immersive-vr');
+        if (isSupported) {
+          vrBtn.disabled = false;
+          vrBtn.innerText = "ENTER VR";
+          vrBtn.addEventListener('click', toggleXRSession);
+        } else {
+          vrBtn.innerText = "VR NOT SUPPORTED";
+        }
+      } else {
+        vrBtn.innerText = "NO WEBXR API";
+      }
+    }
+
+    async function toggleXRSession() {
+      if (!xrSession) {
+        navigator.xr.requestSession('immersive-vr', {
+          requiredFeatures: ['local-floor'],
+          optionalFeatures: ['bounded-floor', 'hand-tracking']
+        }).then((session) => {
+          xrSession = session;
+          renderer.xr.setSession(session);
+          vrBtn.innerText = "EXIT VR";
+
+          session.addEventListener('end', () => {
+            xrSession = null;
+            vrBtn.innerText = "ENTER VR";
+            userRig.rotation.set(0, 0, 0);
+          });
+
+          // Match headset forward vector datum
+          spatialUIGroup.position.set(0, 1.35, -1.8).applyEuler(userRig.rotation);
+          spatialUIGroup.rotation.y = userRig.rotation.y;
+        });
+      } else {
+        xrSession.end();
+      }
+    }
+
+    /* =========================================================================
+       DESKTOP ORBIT FALLBACK
+       ========================================================================= */
+    let lon = 0, lat = 0, isMouseDown = false, mouseX = 0, mouseY = 0;
+    container.addEventListener('pointerdown', (e) => {
+      if (renderer.xr.isPresenting) return;
+      isMouseDown = true; mouseX = e.clientX; mouseY = e.clientY;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!isMouseDown || renderer.xr.isPresenting) return;
+      lon = (mouseX - e.clientX) * 0.15 + lon;
+      lat = (e.clientY - mouseY) * 0.15 + lat;
+      mouseX = e.clientX; mouseY = e.clientY;
+    });
+    window.addEventListener('pointerup', () => { isMouseDown = false; });
+
+    /* =========================================================================
+       ANIMATION LOOP
+       ========================================================================= */
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    renderer.setAnimationLoop(() => {
+      if (renderer.xr.isPresenting) {
+        handleGamepadInput();
+        updateControllerRays();
+      } else {
+        lat = Math.max(-85, Math.min(85, lat));
+        const phi = THREE.MathUtils.degToRad(90 - lat);
+        const theta = THREE.MathUtils.degToRad(lon);
+        camera.lookAt(
+          camera.position.x + Math.sin(phi) * Math.cos(theta),
+          camera.position.y + Math.cos(phi),
+          camera.position.z + Math.sin(phi) * Math.sin(theta)
+        );
+      }
+
+      renderer.render(scene, camera);
+    });
+
+    // Boot
+    setPanorama(0);
+    buildSpatialUI();
+    setupVRControllers();
+    initWebXR();
+  </script>
+</body>
+</html>
