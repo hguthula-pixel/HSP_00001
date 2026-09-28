@@ -3,27 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>SPATIALIS — Architectural WebXR Platform</title>
-  
-  <!-- Modern Architectural Fonts -->
+  <title>SPATIALIS — Architectural VR Exhibition Platform</title>
+
+  <!-- Architectural Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg-base: #0a0b0d;
-      --surface-panel: rgba(18, 20, 24, 0.88);
-      --surface-elevated: #16181d;
-      --border-subtle: #24272e;
-      --border-focus: #3d424d;
-      --text-main: #f3f4f6;
-      --text-muted: #8a919e;
+      --bg-slate: #090a0d;
+      --surface-glass: rgba(15, 17, 21, 0.88);
+      --surface-elevated: #16181f;
+      --border-subtle: #232731;
+      --border-focus: #3e4454;
+      --text-pure: #f3f4f6;
+      --text-muted: #8b93a0;
       --accent: #e25a38; /* Tectonic Terracotta */
       --accent-hover: #f07152;
-      --accent-active: #c44627;
-      --radius-sm: 2px;
-      --radius-md: 4px;
+      --accent-active: #c54728;
+      --beacon-green: #2bb673;
       --font-display: 'Space Grotesk', sans-serif;
       --font-body: 'Inter', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
@@ -41,14 +40,14 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: var(--bg-base);
-      color: var(--text-main);
+      background-color: var(--bg-slate);
+      color: var(--text-pure);
       font-family: var(--font-body);
-      font-size: 14px;
+      font-size: 13px;
       -webkit-font-smoothing: antialiased;
     }
 
-    #webgl-canvas-container {
+    #webgl-container {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -57,11 +56,11 @@
       cursor: grab;
     }
 
-    #webgl-canvas-container:active {
+    #webgl-container:active {
       cursor: grabbing;
     }
 
-    /* Architectural UI Overlay */
+    /* 2D HUD Layout */
     .hud-layer {
       position: absolute;
       inset: 0;
@@ -71,6 +70,7 @@
       flex-direction: column;
       justify-content: space-between;
       padding: 24px;
+      transition: opacity 0.3s ease;
     }
 
     .interactive {
@@ -86,19 +86,22 @@
     }
 
     .brand-mark {
-      background: var(--surface-panel);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: var(--surface-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-subtle);
       padding: 12px 18px;
-      border-radius: var(--radius-sm);
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
     }
 
     .brand-title {
       font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: 0.15em;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       display: flex;
       align-items: center;
@@ -111,13 +114,13 @@
       background: var(--accent);
       border-radius: 50%;
       display: inline-block;
+      box-shadow: 0 0 8px var(--accent);
     }
 
-    .project-name {
-      color: var(--text-muted);
-      font-size: 12px;
-      margin-top: 4px;
+    .nav-breadcrumbs {
       font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
     .action-group {
@@ -126,108 +129,189 @@
     }
 
     .btn {
-      background: var(--surface-panel);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: var(--surface-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-subtle);
-      color: var(--text-main);
-      padding: 10px 16px;
+      color: var(--text-pure);
+      padding: 9px 15px;
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       letter-spacing: 0.05em;
       text-transform: uppercase;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      border-radius: var(--radius-sm);
+      gap: 7px;
+      border-radius: 2px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .btn:hover {
       border-color: var(--border-focus);
       background: var(--surface-elevated);
+      color: #fff;
     }
 
-    .btn-vr {
+    .btn-accent {
       background: var(--accent);
       border-color: var(--accent);
       color: #fff;
     }
 
-    .btn-vr:hover {
+    .btn-accent:hover {
       background: var(--accent-hover);
       border-color: var(--accent-hover);
     }
 
-    .btn-vr:disabled {
-      background: #2a2d34;
-      border-color: #2a2d34;
-      color: #666;
+    .btn:disabled {
+      background: #1c1e24;
+      border-color: #242731;
+      color: #555b68;
       cursor: not-allowed;
     }
 
-    /* Hotspot Annotation Drawer */
+    /* Architectural Block / Site Map Overlay */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 10, 13, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-window {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 2px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .map-canvas-container {
+      background: #060709;
+      border: 1px solid var(--border-subtle);
+      border-radius: 2px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .block-details {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .block-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .block-item {
+      padding: 12px 16px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.15s ease;
+    }
+
+    .block-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-focus);
+    }
+
+    .block-item.active {
+      border-color: var(--accent);
+      background: rgba(226, 90, 56, 0.08);
+    }
+
+    /* Hotspot Annotation Panel */
     .annotation-panel {
       position: absolute;
-      top: 90px;
+      top: 96px;
       right: 24px;
       width: 320px;
-      background: var(--surface-panel);
+      background: var(--surface-glass);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-subtle);
       padding: 20px;
-      border-radius: var(--radius-sm);
+      border-radius: 2px;
       transform: translateX(360px);
       transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
     }
 
     .annotation-panel.active {
       transform: translateX(0);
     }
 
-    .annotation-tag {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 6px;
-    }
-
-    .annotation-title {
-      font-family: var(--font-display);
-      font-size: 16px;
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    .annotation-body {
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--text-muted);
-    }
-
-    /* Bottom Scene Selector */
+    /* Bottom Bar & Scene Drawer */
     .bottom-bar {
       display: flex;
       flex-direction: column;
-      gap: 12px;
       align-items: center;
-      width: 100%;
+      gap: 12px;
     }
 
     .scene-reel {
-      background: var(--surface-panel);
+      background: var(--surface-glass);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid var(--border-subtle);
-      padding: 8px;
-      border-radius: var(--radius-sm);
+      padding: 6px;
+      border-radius: 2px;
       display: flex;
-      gap: 8px;
+      gap: 6px;
       max-width: 100%;
       overflow-x: auto;
       scrollbar-width: none;
@@ -237,132 +321,114 @@
       display: none;
     }
 
-    .scene-node {
-      padding: 8px 14px;
+    .scene-pill {
+      padding: 7px 14px;
       background: transparent;
       border: 1px solid transparent;
       color: var(--text-muted);
       cursor: pointer;
-      border-radius: var(--radius-sm);
+      border-radius: 2px;
       white-space: nowrap;
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      align-items: center;
+      gap: 8px;
       transition: all 0.15s ease;
     }
 
-    .scene-node:hover {
-      color: var(--text-main);
-      background: rgba(255, 255, 255, 0.03);
+    .scene-pill:hover {
+      color: var(--text-pure);
+      background: rgba(255, 255, 255, 0.04);
     }
 
-    .scene-node.active {
-      color: var(--text-main);
+    .scene-pill.active {
+      color: #fff;
       border-color: var(--border-focus);
       background: var(--surface-elevated);
     }
 
-    .scene-id {
+    .scene-pill-index {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--accent);
     }
 
-    .scene-name {
-      font-size: 12px;
-      font-weight: 500;
-    }
-
-    /* Loading Veil */
-    #loader {
+    /* Screen Fade Veil */
+    #comfort-fade {
       position: absolute;
       inset: 0;
-      background: var(--bg-base);
+      background: #000;
       z-index: 100;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      transition: opacity 0.4s ease;
-    }
-
-    #loader.hidden {
       opacity: 0;
       pointer-events: none;
+      transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1);
     }
 
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 2px solid var(--border-subtle);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    #comfort-fade.active {
+      opacity: 1;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* File drop styling for local Enscape testing */
-    #drop-zone-overlay {
+    /* File drop overlay for custom Enscape renders */
+    #drop-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(10, 11, 13, 0.9);
+      background: rgba(9, 10, 13, 0.92);
       border: 2px dashed var(--accent);
-      z-index: 50;
+      z-index: 90;
       display: none;
       align-items: center;
       justify-content: center;
       font-family: var(--font-mono);
       font-size: 14px;
-      color: var(--text-main);
+      letter-spacing: 0.1em;
+      color: var(--text-pure);
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 800px) {
       .hud-layer { padding: 16px; }
-      .project-name { display: none; }
+      .modal-body { grid-template-columns: 1fr; }
       .annotation-panel { width: calc(100% - 32px); right: 16px; top: auto; bottom: 120px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Loading State -->
-  <div id="loader">
-    <div class="spinner"></div>
-    <div style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text-muted);">
-      INITIALIZING WEBXR PIPELINE...
-    </div>
-  </div>
+  <!-- Screen fade veil for VR comfort transitions -->
+  <div id="comfort-fade"></div>
 
-  <!-- Drag-and-Drop Local Enscape Render Feedback -->
-  <div id="drop-zone-overlay">DROP EQUIRECTANGULAR PANORAMA TO VIEW</div>
+  <!-- Local Enscape Render Drop Target -->
+  <div id="drop-overlay">DROP 360° EQUIRECTANGULAR IMAGE (2:1)</div>
 
   <!-- Three.js Canvas Container -->
-  <div id="webgl-canvas-container"></div>
+  <div id="webgl-container"></div>
 
-  <!-- 2D Desktop / Mobile UI Layer -->
-  <div class="hud-layer">
+  <!-- 2D Desktop / Tablet HUD -->
+  <div class="hud-layer" id="hud-layer">
     <header class="top-bar">
       <div class="brand-mark interactive">
         <div class="brand-title">
           <span class="brand-indicator"></span>
           SPATIALIS
         </div>
-        <div class="project-name" id="ui-project-label">POORNA MARKET REDEVELOPMENT</div>
+        <div class="nav-breadcrumbs" id="nav-breadcrumbs">
+          POORNA MARKET / BLOCK A / 01 MAIN ENTRANCE
+        </div>
       </div>
 
       <div class="action-group interactive">
-        <input type="file" id="local-file-input" accept="image/*" style="display: none;" />
-        <button class="btn" id="btn-upload" title="Test custom Enscape 360 Render">
+        <button class="btn" id="btn-back" title="Step Back in History">
+          <span>← BACK</span>
+        </button>
+        <button class="btn" id="btn-map" title="Architectural Block Masterplan">
+          <span>MAP / BLOCKS</span>
+        </button>
+        <button class="btn" id="btn-audio" title="Toggle Spatial Audio">
+          <span id="audio-icon">🔇 AUDIO OFF</span>
+        </button>
+        <input type="file" id="file-input" accept="image/*" style="display: none;" />
+        <button class="btn" id="btn-upload" title="Test custom Enscape Render">
           <span>UPLOAD 360</span>
         </button>
-        <button class="btn" id="btn-fullscreen">
-          <span>FULLSCREEN</span>
-        </button>
-        <button class="btn btn-vr" id="btn-webxr" disabled>
+        <button class="btn btn-accent" id="btn-enter-vr" disabled>
           <span>CHECKING VR...</span>
         </button>
       </div>
@@ -370,97 +436,233 @@
 
     <!-- Contextual Hotspot Note -->
     <div class="annotation-panel interactive" id="annotation-card">
-      <div class="annotation-tag" id="anno-category">TECTONIC DETAIL</div>
-      <div class="annotation-title" id="anno-title">Exposed Truss Framework</div>
-      <div class="annotation-body" id="anno-desc">
-        Lightweight steel space-frame providing unobstructed floor clearance while respecting the 1935 original structural grid.
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent); margin-bottom: 4px;" id="anno-category">TECTONIC DETAIL</div>
+      <div style="font-family: var(--font-display); font-size: 15px; font-weight: 600; margin-bottom: 8px;" id="anno-title">Exposed Steel Truss</div>
+      <div style="font-size: 12px; line-height: 1.6; color: var(--text-muted);" id="anno-desc">
+        Lightweight spatial framework providing unobstructed clearance above market stalls while preserving the 1935 heritage datum.
       </div>
+      <button class="btn" style="margin-top: 12px; width: 100%; justify-content: center;" onclick="document.getElementById('annotation-card').classList.remove('active')">DISMISS</button>
     </div>
 
-    <!-- Scene Navigation Drawer -->
+    <!-- Bottom Scene Reel -->
     <footer class="bottom-bar">
-      <nav class="scene-reel interactive" id="scene-selector-container">
-        <!-- Rendered dynamically from project schema -->
+      <nav class="scene-reel interactive" id="scene-reel-container">
+        <!-- Injected dynamically -->
       </nav>
     </footer>
   </div>
 
-  <!-- Three.js + WebXR Bundles from CDN -->
+  <!-- Masterplan / Block Selection Modal -->
+  <div class="modal-backdrop" id="modal-map">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">Site Masterplan & Block Architecture</div>
+        <button class="btn" id="btn-close-modal">✕ CLOSE</button>
+      </div>
+      <div class="modal-body">
+        <div class="map-canvas-container">
+          <canvas id="site-map-canvas" width="400" height="400" style="width:100%; height:100%;"></canvas>
+        </div>
+        <div class="block-details">
+          <div class="block-list" id="block-roster">
+            <!-- Injected dynamically -->
+          </div>
+          <div style="margin-top: 16px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+            <button class="btn btn-accent" id="btn-teleport-block" style="width: 100%; justify-content: center;">
+              TELEPORT TO BLOCK
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <script>
     /* =========================================================================
-       PROJECT SCHEMA & STATE DEFINITION
+       01. ARCHITECTURAL SCHEMA (BLOCKS, SCENES, GRAPH CONNECTIONS, HOTSPOTS)
        ========================================================================= */
-    const PROJECT_DATA = {
+    const ARCH_PROJECT = {
       id: "poorna-market",
-      name: "Poorna Market Redevelopment",
+      title: "Poorna Market Redevelopment",
       location: "Visakhapatnam, India",
-      scenes: [
+      blocks: [
         {
-          id: "01",
-          name: "Main Entrance",
-          zone: "Threshold & Colonnade",
-          color1: "#2B1E1A",
-          color2: "#0D0E12",
+          id: "block-a",
+          code: "BLOCK A",
+          name: "Heritage Colonnade",
+          desc: "Restored 1935 civic arcade functioning as the main arrival threshold.",
+          defaultSceneId: "scene-01",
+          mapRect: { x: 50, y: 300, w: 300, h: 60 }
+        },
+        {
+          id: "block-b",
+          code: "BLOCK B",
+          name: "Central Spine & Puja Market",
+          desc: "Central ventilation breezeway connecting flower guilds and ritual stalls.",
+          defaultSceneId: "scene-02",
+          mapRect: { x: 120, y: 180, w: 160, h: 100 }
+        },
+        {
+          id: "block-c",
+          code: "BLOCK C",
+          name: "Perishable Food Hall",
+          desc: "High-volume vegetable and produce hall with continuous drainage channels.",
+          defaultSceneId: "scene-03",
+          mapRect: { x: 40, y: 60, w: 140, h: 100 }
+        },
+        {
+          id: "block-d",
+          code: "BLOCK D",
+          name: "Banyan Public Court",
+          desc: "Open civic forum centered around an ancient preserved banyan anchor.",
+          defaultSceneId: "scene-04",
+          mapRect: { x: 220, y: 60, w: 140, h: 100 }
+        }
+      ],
+      scenes: {
+        "scene-01": {
+          id: "scene-01",
+          blockId: "block-a",
+          name: "Main Entrance Gateway",
+          colors: ["#2a1f1b", "#0d0e12"],
           hotspots: [
-            { x: 30, y: 5, z: -40, title: "1935 Facade Preservation", category: "HERITAGE", desc: "Original stone masonry stabilized and framed by an open air colonnade." }
+            { x: 28, y: 4, z: -38, category: "HERITAGE", title: "1935 Archway", desc: "Original lime-mortar arch reinforced through internal tie-rods." }
+          ],
+          connections: [
+            { targetId: "scene-02", label: "Enter Central Spine", pos: [0, -1.6, -8] }
           ]
         },
-        {
-          id: "02",
-          name: "Central Market Street",
-          zone: "Primary Spine",
-          color1: "#1A222B",
-          color2: "#0A0B0E",
+        "scene-02": {
+          id: "scene-02",
+          blockId: "block-b",
+          name: "Central Spine / Puja Stalls",
+          colors: ["#23211b", "#0a0b0e"],
           hotspots: [
-            { x: -35, y: 10, z: -35, title: "Ventilation Lanterns", category: "CLIMATE", desc: "Clerestory louvers inducing passive stack effect through the market hall." }
+            { x: -30, y: 8, z: -35, category: "CLIMATE", title: "Lantern Louvers", desc: "Passive stack-effect monitors expelling warm air upward." }
+          ],
+          connections: [
+            { targetId: "scene-01", label: "Back to Colonnade", pos: [0, -1.6, 8] },
+            { targetId: "scene-03", label: "To Perishables", pos: [-8, -1.6, -2] },
+            { targetId: "scene-04", label: "To Banyan Court", pos: [8, -1.6, -2] }
           ]
         },
-        {
-          id: "03",
-          name: "Puja Market",
-          zone: "Ritual & Flower Guild",
-          color1: "#2B281A",
-          color2: "#0C0D0F",
+        "scene-03": {
+          id: "scene-03",
+          blockId: "block-c",
+          name: "Vegetable Produce Hall",
+          colors: ["#1c261e", "#090d0b"],
           hotspots: [
-            { x: 0, y: -8, z: -45, title: "Basalt Basin", category: "MATERIAL", desc: "Locally sourced stone counters with continuous greywater catchment channels." }
+            { x: 0, y: -6, z: -35, category: "MATERIAL", title: "Basalt Platforms", desc: "Antibacterial volcanic stone slab counters with integrated spray wash lines." }
+          ],
+          connections: [
+            { targetId: "scene-02", label: "Back to Central Spine", pos: [8, -1.6, 2] }
           ]
         },
-        {
-          id: "04",
-          name: "Vegetable Market",
-          zone: "Perishable Goods Hall",
-          color1: "#1A2B20",
-          color2: "#0A0D0B",
-          hotspots: []
-        },
-        {
-          id: "05",
-          name: "Courtyard",
-          zone: "Public Realm",
-          color1: "#221A2B",
-          color2: "#0A0A0D",
+        "scene-04": {
+          id: "scene-04",
+          blockId: "block-d",
+          name: "Banyan Public Court",
+          colors: ["#1f1e29", "#09090d"],
           hotspots: [
-            { x: 40, y: 15, z: 20, title: "Banyan Tree Core", category: "LANDSCAPE", desc: "Central gathering court planned around the historic banyan anchor." }
+            { x: 32, y: 12, z: 25, category: "LANDSCAPE", title: "Heritage Banyan", desc: "Root aeration chambers protecting root plate integrity below stone paving." }
+          ],
+          connections: [
+            { targetId: "scene-02", label: "Back to Central Spine", pos: [-8, -1.6, 2] }
           ]
         }
-      ]
+      }
     };
 
-    let activeSceneIndex = 0;
+    /* =========================================================================
+       02. APPLICATION STATE & NAVIGATION HISTORY STACK
+       ========================================================================= */
+    const State = {
+      activeBlockId: "block-a",
+      activeSceneId: "scene-01",
+      history: [],
+      audioEnabled: false,
+      isVRMenuOpen: false
+    };
+
+    function navigateToScene(sceneId, addToHistory = true) {
+      if (sceneId === State.activeSceneId) return;
+
+      if (addToHistory) {
+        State.history.push(State.activeSceneId);
+      }
+
+      // Trigger comfort fade (dip to black)
+      const fadeEl = document.getElementById('comfort-fade');
+      fadeEl.classList.add('active');
+
+      setTimeout(() => {
+        State.activeSceneId = sceneId;
+        const sceneData = ARCH_PROJECT.scenes[sceneId];
+        State.activeBlockId = sceneData.blockId;
+
+        updatePanorama(sceneData);
+        rebuildWorldTeleportMarkers(sceneData.connections);
+        rebuildWorldHotspots(sceneData.hotspots);
+        update2DHUD();
+        drawSiteMap();
+
+        setTimeout(() => {
+          fadeEl.classList.remove('active');
+        }, 150);
+      }, 200);
+    }
+
+    function stepBack() {
+      if (State.history.length > 0) {
+        const prevSceneId = State.history.pop();
+        navigateToScene(prevSceneId, false);
+      } else {
+        openMapModal();
+      }
+    }
 
     /* =========================================================================
-       PROCEDURAL EQUIRECTANGULAR GENERATOR
-       (Used as fallback prior to loading physical Enscape renders)
+       03. THREE.JS & PROCEDURAL EQUIRECTANGULAR ENGINE
        ========================================================================= */
-    function createProceduralPanorama(color1, color2, labelText) {
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 0.01);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // Inverted Equirectangular Sky-Sphere (100m radius)
+    const sphereGeo = new THREE.SphereGeometry(100, 64, 40);
+    sphereGeo.scale(-1, 1, 1);
+    const sphereMat = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+    const skyMesh = new THREE.Mesh(sphereGeo, sphereMat);
+    scene.add(skyMesh);
+
+    // Interactive Groups
+    const teleportMarkerGroup = new THREE.Group();
+    const hotspotGroup = new THREE.Group();
+    scene.add(teleportMarkerGroup);
+    scene.add(hotspotGroup);
+
+    // VR Spatial Menu Slate Group (anchored in world space)
+    const vrMenuSlate = new THREE.Group();
+    vrMenuSlate.visible = false;
+    scene.add(vrMenuSlate);
+
+    function generateProceduralPano(color1, color2, title) {
       const canvas = document.createElement('canvas');
       canvas.width = 4096;
       canvas.height = 2048;
       const ctx = canvas.getContext('2d');
 
-      // Gradient background mimicking interior ambient light
       const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
       grad.addColorStop(0, color2);
       grad.addColorStop(0.5, color1);
@@ -468,20 +670,14 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Architectural Perspective Grid Lines
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      // Architectural Perspective Lines
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
       ctx.lineWidth = 2;
       for (let x = 0; x < canvas.width; x += 128) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
       }
       for (let y = 0; y < canvas.height; y += 128) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
       // Horizon line
@@ -492,107 +688,54 @@
       ctx.lineTo(canvas.width, canvas.height / 2);
       ctx.stroke();
 
-      // Spatial Orientation Coordinates
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-      ctx.font = "bold 64px 'Space Grotesk', monospace";
+      // Architectural Spatial Tags
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.font = "bold 60px 'Space Grotesk', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`NORTH // ${labelText.toUpperCase()}`, canvas.width * 0.25, canvas.height / 2 - 40);
-      ctx.fillText(`SOUTH // ${labelText.toUpperCase()}`, canvas.width * 0.75, canvas.height / 2 - 40);
+      ctx.fillText(`NORTH // ${title.toUpperCase()}`, canvas.width * 0.25, canvas.height / 2 - 40);
+      ctx.fillText(`SOUTH // ${title.toUpperCase()}`, canvas.width * 0.75, canvas.height / 2 - 40);
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.wrapS = THREE.RepeatWrapping;
-      texture.repeat.x = -1; // Invert horizontally to correct internal sphere mapping
+      texture.repeat.x = -1; // Correct inverted normals
       return texture;
     }
 
-    /* =========================================================================
-       THREE.JS CORE ARCHITECTURE
-       ========================================================================= */
-    const container = document.getElementById('webgl-canvas-container');
-    const scene = new THREE.Scene();
-    
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 0.1);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.xr.enabled = true; // WebXR core enabled
-    container.appendChild(renderer.domElement);
-
-    // Inverted 360° Sphere Geometry
-    const sphereGeometry = new THREE.SphereGeometry(100, 64, 40);
-    sphereGeometry.scale(-1, 1, 1); // Turn face normals inwards
-
-    const sphereMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
-    const panoramaMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    scene.add(panoramaMesh);
-
-    // Hotspot Container Group
-    const hotspotGroup = new THREE.Group();
-    scene.add(hotspotGroup);
-
-    /* =========================================================================
-       CAMERA ORBIT & USER INTERACTION (DESKTOP / TOUCH)
-       ========================================================================= */
-    let isUserInteracting = false;
-    let onPointerDownMouseX = 0, onPointerDownMouseY = 0;
-    let lon = 0, onPointerDownLon = 0;
-    let lat = 0, onPointerDownLat = 0;
-    let phi = 0, theta = 0;
-
-    function bindOrbitControls() {
-      container.addEventListener('pointerdown', (e) => {
-        if (renderer.xr.isPresenting) return;
-        isUserInteracting = true;
-        onPointerDownMouseX = e.clientX;
-        onPointerDownMouseY = e.clientY;
-        onPointerDownLon = lon;
-        onPointerDownLat = lat;
-      });
-
-      window.addEventListener('pointermove', (e) => {
-        if (!isUserInteracting || renderer.xr.isPresenting) return;
-        lon = (onPointerDownMouseX - e.clientX) * 0.15 + onPointerDownLon;
-        lat = (e.clientY - onPointerDownMouseY) * 0.15 + onPointerDownLat;
-      });
-
-      window.addEventListener('pointerup', () => { isUserInteracting = false; });
-
-      // Field of View Wheel Zoom
-      container.addEventListener('wheel', (e) => {
-        if (renderer.xr.isPresenting) return;
-        camera.fov = Math.max(30, Math.min(90, camera.fov + e.deltaY * 0.05));
-        camera.updateProjectionMatrix();
-      });
-    }
-    bindOrbitControls();
-
-    /* =========================================================================
-       SCENE TRANSITIONS & TEXTURE MANAGEMENT
-       ========================================================================= */
-    function loadScene(index) {
-      activeSceneIndex = index;
-      const data = PROJECT_DATA.scenes[index];
-
-      // Update HUD Scene Nodes
-      document.querySelectorAll('.scene-node').forEach((node, i) => {
-        node.classList.toggle('active', i === index);
-      });
-
-      // Dismiss open annotation panel
-      document.getElementById('annotation-card').classList.remove('active');
-
-      // Texture Swap with Garbage Collection
-      if (sphereMaterial.map) sphereMaterial.map.dispose();
-      sphereMaterial.map = createProceduralPanorama(data.color1, data.color2, `${data.id} — ${data.name}`);
-      sphereMaterial.needsUpdate = true;
-
-      // Rebuild 3D Hotspot Markers in World Space
-      rebuildHotspots(data.hotspots);
+    function updatePanorama(sceneData) {
+      if (skyMesh.material.map) skyMesh.material.map.dispose();
+      skyMesh.material.map = generateProceduralPano(sceneData.colors[0], sceneData.colors[1], sceneData.name);
+      skyMesh.material.needsUpdate = true;
     }
 
-    function rebuildHotspots(hotspotList) {
+    /* =========================================================================
+       04. GROUND TELEPORT BEACONS & ARCHITECTURAL HOTSPOTS
+       ========================================================================= */
+    function rebuildWorldTeleportMarkers(connections) {
+      while (teleportMarkerGroup.children.length > 0) {
+        const obj = teleportMarkerGroup.children[0];
+        obj.geometry.dispose();
+        obj.material.dispose();
+        teleportMarkerGroup.remove(obj);
+      }
+
+      connections.forEach(conn => {
+        // Floor Target Disc
+        const geo = new THREE.RingGeometry(0.3, 0.65, 32);
+        geo.rotateX(-Math.PI / 2);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xe25a38,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.8
+        });
+        const ring = new THREE.Mesh(geo, mat);
+        ring.position.set(...conn.pos);
+        ring.userData = { type: "teleport", targetId: conn.targetId, label: conn.label };
+        teleportMarkerGroup.add(ring);
+      });
+    }
+
+    function rebuildWorldHotspots(hotspots) {
       while (hotspotGroup.children.length > 0) {
         const obj = hotspotGroup.children[0];
         obj.geometry.dispose();
@@ -600,38 +743,270 @@
         hotspotGroup.remove(obj);
       }
 
-      hotspotList.forEach(data => {
-        const geo = new THREE.RingGeometry(0.8, 1.2, 32);
-        const mat = new THREE.MeshBasicMaterial({ 
-          color: 0xe25a38, 
+      hotspots.forEach(data => {
+        const geo = new THREE.RingGeometry(0.5, 0.8, 32);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0x2bb673,
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.85
         });
         const marker = new THREE.Mesh(geo, mat);
         marker.position.set(data.x, data.y, data.z);
-        marker.lookAt(camera.position); // Always face central camera datum
-        marker.userData = data;
+        marker.userData = { type: "hotspot", ...data };
         hotspotGroup.add(marker);
       });
     }
 
     /* =========================================================================
-       RAYCASTING & INTERACTION (MOUSE & DESKTOP CLICKS)
+       05. VR SPATIAL GAME MENU (CURVED SLATE IN 3D SPACE)
        ========================================================================= */
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    function buildVRSpatialMenu() {
+      // Background curved slab
+      const slateGeo = new THREE.PlaneGeometry(1.6, 1.2);
+      const slateMat = new THREE.MeshBasicMaterial({
+        color: 0x0f1115,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide
+      });
+      const slateMesh = new THREE.Mesh(slateGeo, slateMat);
+      vrMenuSlate.add(slateMesh);
+
+      // Create Interactive Spatial Buttons on the slate
+      const buttons = [
+        { label: "▶ CONTINUE", action: () => toggleVRMenu(false), y: 0.35 },
+        { label: "◈ BLOCKS / MAP", action: () => { toggleVRMenu(false); openMapModal(); }, y: 0.12 },
+        { label: "🔊 TOGGLE SOUND", action: toggleAudio, y: -0.11 },
+        { label: "← EXIT VR", action: () => { if (renderer.xr.getSession()) renderer.xr.getSession().end(); }, y: -0.34 }
+      ];
+
+      buttons.forEach(b => {
+        const btnCanvas = document.createElement('canvas');
+        btnCanvas.width = 512;
+        btnCanvas.height = 100;
+        const bCtx = btnCanvas.getContext('2d');
+        bCtx.fillStyle = "#1b1e25";
+        bCtx.fillRect(0, 0, 512, 100);
+        bCtx.strokeStyle = "#3e4454";
+        bCtx.lineWidth = 4;
+        bCtx.strokeRect(0, 0, 512, 100);
+        bCtx.fillStyle = "#f3f4f6";
+        bCtx.font = "bold 40px 'Space Grotesk', sans-serif";
+        bCtx.textAlign = "center";
+        bCtx.fillText(b.label, 256, 65);
+
+        const tex = new THREE.CanvasTexture(btnCanvas);
+        const bMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.2, 0.2),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+        );
+        bMesh.position.set(0, b.y, 0.02);
+        bMesh.userData = { type: "vr-menu-btn", action: b.action };
+        vrMenuSlate.add(bMesh);
+      });
+    }
+    buildVRSpatialMenu();
+
+    function toggleVRMenu(forceState) {
+      State.isVRMenuOpen = forceState !== undefined ? forceState : !State.isVRMenuOpen;
+      vrMenuSlate.visible = State.isVRMenuOpen;
+
+      if (State.isVRMenuOpen) {
+        // Place menu 1.8m in front of current headset orientation
+        const camDir = new THREE.Vector3();
+        camera.getWorldDirection(camDir);
+        camDir.y = 0; // Keep level horizontally
+        camDir.normalize();
+
+        vrMenuSlate.position.copy(camera.position).add(camDir.multiplyScalar(1.8));
+        vrMenuSlate.position.y = camera.position.y - 0.1;
+        vrMenuSlate.lookAt(camera.position);
+      }
+    }
+
+    /* =========================================================================
+       06. WEBXR & META QUEST CONTROLLER INTEGRATION
+       ========================================================================= */
+    const vrBtn = document.getElementById('btn-enter-vr');
+    let xrSession = null;
+    const controllers = [];
+
+    async function initWebXR() {
+      if ('xr' in navigator) {
+        const supported = await navigator.xr.isSessionSupported('immersive-vr');
+        if (supported) {
+          vrBtn.disabled = false;
+          vrBtn.innerHTML = "<span>ENTER VR</span>";
+          vrBtn.addEventListener('click', toggleVRSession);
+        } else {
+          vrBtn.innerHTML = "<span>VR NOT SUPPORTED</span>";
+        }
+      } else {
+        vrBtn.innerHTML = "<span>NO WEBXR API</span>";
+      }
+    }
+
+    async function toggleVRSession() {
+      if (!xrSession) {
+        xrSession = await navigator.xr.requestSession('immersive-vr', {
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+        });
+        xrSession.addEventListener('end', () => {
+          xrSession = null;
+          vrBtn.innerHTML = "<span>ENTER VR</span>";
+          vrMenuSlate.visible = false;
+        });
+        await renderer.xr.setSession(xrSession);
+        vrBtn.innerHTML = "<span>EXIT VR</span>";
+        setupVRControllers();
+      } else {
+        xrSession.end();
+      }
+    }
+
+    function setupVRControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+
+        // Visual pointer laser beam
+        const laserGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -5)
+        ]);
+        const laserMat = new THREE.LineBasicMaterial({ color: 0xe25a38, transparent: true, opacity: 0.6 });
+        const laser = new THREE.Line(laserGeo, laserMat);
+        controller.add(laser);
+
+        // Primary Trigger Raycast Select
+        controller.addEventListener('selectstart', () => {
+          const tempMatrix = new THREE.Matrix4();
+          tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+          const raycaster = new THREE.Raycaster();
+          raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+          raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+          // Test Menu interaction first if menu is open
+          if (State.isVRMenuOpen) {
+            const menuHits = raycaster.intersectObjects(vrMenuSlate.children);
+            if (menuHits.length > 0 && menuHits[0].object.userData.action) {
+              menuHits[0].object.userData.action();
+              return;
+            }
+          }
+
+          // Test Ground Teleport Beacons
+          const teleHits = raycaster.intersectObjects(teleportMarkerGroup.children);
+          if (teleHits.length > 0) {
+            const targetId = teleHits[0].object.userData.targetId;
+            navigateToScene(targetId);
+            return;
+          }
+
+          // Test Hotspots
+          const hotHits = raycaster.intersectObjects(hotspotGroup.children);
+          if (hotHits.length > 0) {
+            const hData = hotHits[0].object.userData;
+            showAnnotation(hData);
+          }
+        });
+
+        // Controller Buttons & Thumbstick mapping
+        controller.addEventListener('connected', (e) => {
+          controller.userData.gamepad = e.data.gamepad;
+          controller.userData.handedness = e.data.handedness;
+        });
+
+        scene.add(controller);
+        controllers.push(controller);
+      }
+    }
+
+    // Polling Quest Gamepad inputs (Stick turn, Menu buttons)
+    function handleXRInputs() {
+      controllers.forEach(ctrl => {
+        const gp = ctrl.userData.gamepad;
+        if (!gp) return;
+
+        // Button [4] or [5] is typically Menu/Y on Meta Quest
+        if (gp.buttons[4]?.pressed || gp.buttons[5]?.pressed) {
+          if (!ctrl.userData.menuButtonLocked) {
+            toggleVRMenu();
+            ctrl.userData.menuButtonLocked = true;
+          }
+        } else {
+          ctrl.userData.menuButtonLocked = false;
+        }
+
+        // Thumbstick snap-turning (Axes 2 or 0)
+        const axisX = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
+        if (Math.abs(axisX) > 0.75) {
+          if (!ctrl.userData.turnLocked) {
+            const turnAngle = axisX > 0 ? -Math.PI / 6 : Math.PI / 6; // 30° snap turn
+            skyMesh.rotation.y += turnAngle;
+            teleportMarkerGroup.rotation.y += turnAngle;
+            hotspotGroup.rotation.y += turnAngle;
+            ctrl.userData.turnLocked = true;
+          }
+        } else {
+          ctrl.userData.turnLocked = false;
+        }
+      });
+    }
+
+    /* =========================================================================
+       07. 2D DESKTOP CONTROLS & RAYCASTING
+       ========================================================================= */
+    let isUserInteracting = false;
+    let onPointerDownMouseX = 0, onPointerDownMouseY = 0;
+    let lon = 0, onPointerDownLon = 0;
+    let lat = 0, onPointerDownLat = 0;
+
+    container.addEventListener('pointerdown', (e) => {
+      if (renderer.xr.isPresenting) return;
+      isUserInteracting = true;
+      onPointerDownMouseX = e.clientX;
+      onPointerDownMouseY = e.clientY;
+      onPointerDownLon = lon;
+      onPointerDownLat = lat;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isUserInteracting || renderer.xr.isPresenting) return;
+      lon = (onPointerDownMouseX - e.clientX) * 0.15 + onPointerDownLon;
+      lat = (e.clientY - onPointerDownMouseY) * 0.15 + onPointerDownLat;
+    });
+
+    window.addEventListener('pointerup', () => { isUserInteracting = false; });
+
+    container.addEventListener('wheel', (e) => {
+      if (renderer.xr.isPresenting) return;
+      camera.fov = Math.max(30, Math.min(90, camera.fov + e.deltaY * 0.05));
+      camera.updateProjectionMatrix();
+    });
+
+    // 2D Click Selection for Teleport Beacons and Hotspots
+    const mouseRaycaster = new THREE.Raycaster();
+    const mouseCoord = new THREE.Vector2();
 
     container.addEventListener('click', (e) => {
       if (renderer.xr.isPresenting) return;
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
+      mouseCoord.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseCoord.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      mouseRaycaster.setFromCamera(mouseCoord, camera);
 
-      const intersects = raycaster.intersectObjects(hotspotGroup.children);
-      if (intersects.length > 0) {
-        const hData = intersects[0].object.userData;
-        showAnnotation(hData);
+      // Check ground beacons
+      const teleHits = mouseRaycaster.intersectObjects(teleportMarkerGroup.children);
+      if (teleHits.length > 0) {
+        navigateToScene(teleHits[0].object.userData.targetId);
+        return;
+      }
+
+      // Check Hotspots
+      const hotHits = mouseRaycaster.intersectObjects(hotspotGroup.children);
+      if (hotHits.length > 0) {
+        showAnnotation(hotHits[0].object.userData);
       }
     });
 
@@ -643,162 +1018,169 @@
     }
 
     /* =========================================================================
-       WEBXR & META QUEST SPECIFIC ARCHITECTURE
-       ========================================================================= */
-    const vrBtn = document.getElementById('btn-webxr');
-    let currentVRSession = null;
+       08. 2D HUD, MASTERPLAN MODAL & AUDIO SYSTEM
+       ======================================================================== */
+    function update2DHUD() {
+      const activeScene = ARCH_PROJECT.scenes[State.activeSceneId];
+      const activeBlock = ARCH_PROJECT.blocks.find(b => b.id === State.activeBlockId);
 
-    async function checkWebXRSupport() {
-      if ('xr' in navigator) {
-        const supported = await navigator.xr.isSessionSupported('immersive-vr');
-        if (supported) {
-          vrBtn.disabled = false;
-          vrBtn.innerHTML = "<span>ENTER VR</span>";
-          vrBtn.addEventListener('click', toggleVR);
-        } else {
-          vrBtn.innerHTML = "<span>VR UNAVAILABLE</span>";
+      document.getElementById('nav-breadcrumbs').innerText = 
+        `${ARCH_PROJECT.title.toUpperCase()} / ${activeBlock.code} / ${activeScene.name.toUpperCase()}`;
+
+      // Update Bottom Scene Reel
+      const reel = document.getElementById('scene-reel-container');
+      reel.innerHTML = '';
+      Object.values(ARCH_PROJECT.scenes).forEach(sc => {
+        const btn = document.createElement('button');
+        btn.className = `scene-pill ${sc.id === State.activeSceneId ? 'active' : ''}`;
+        btn.innerHTML = `<span class="scene-pill-index">${sc.id.split('-')[1]}</span> ${sc.name}`;
+        btn.onclick = () => navigateToScene(sc.id);
+        reel.appendChild(btn);
+      });
+    }
+
+    // Architectural Site Diagram Canvas Drawing
+    function drawSiteMap() {
+      const canvas = document.getElementById('site-map-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background grid
+      ctx.strokeStyle = "#161820";
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 20) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 20) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Draw Architectural Blocks
+      ARCH_PROJECT.blocks.forEach(block => {
+        const isActive = block.id === State.activeBlockId;
+        ctx.fillStyle = isActive ? "rgba(226, 90, 56, 0.25)" : "rgba(35, 39, 49, 0.6)";
+        ctx.strokeStyle = isActive ? "#e25a38" : "#3e4454";
+        ctx.lineWidth = isActive ? 2 : 1;
+
+        const r = block.mapRect;
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+        ctx.fillStyle = isActive ? "#f3f4f6" : "#8b93a0";
+        ctx.font = "bold 10px 'Space Grotesk', sans-serif";
+        ctx.fillText(block.code, r.x + 8, r.y + 18);
+        ctx.font = "9px 'Inter', sans-serif";
+        ctx.fillText(block.name, r.x + 8, r.y + 32);
+
+        // Draw active location beacon
+        if (isActive) {
+          ctx.fillStyle = "#2bb673";
+          ctx.beginPath();
+          ctx.arc(r.x + r.w / 2, r.y + r.h / 2, 5, 0, Math.PI * 2);
+          ctx.fill();
         }
-      } else {
-        vrBtn.innerHTML = "<span>NO WEBXR API</span>";
-      }
+      });
     }
 
-    async function toggleVR() {
-      if (!currentVRSession) {
-        navigator.xr.requestSession('immersive-vr', {
-          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-        }).then(onVRSessionStarted);
-      } else {
-        currentVRSession.end();
-      }
+    function openMapModal() {
+      document.getElementById('modal-map').classList.add('active');
+      drawSiteMap();
+      renderBlockList();
     }
 
-    function onVRSessionStarted(session) {
-      currentVRSession = session;
-      session.addEventListener('end', onVRSessionEnded);
-      renderer.xr.setSession(session);
-      vrBtn.innerHTML = "<span>EXIT VR</span>";
-      setupVRControllers();
+    function renderBlockList() {
+      const roster = document.getElementById('block-roster');
+      roster.innerHTML = '';
+      ARCH_PROJECT.blocks.forEach(block => {
+        const item = document.createElement('div');
+        item.className = `block-item ${block.id === State.activeBlockId ? 'active' : ''}`;
+        item.innerHTML = `
+          <div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--accent);">${block.code}</div>
+            <div style="font-weight: 500; font-size: 13px;">${block.name}</div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">ENTER →</div>
+        `;
+        item.onclick = () => {
+          State.activeBlockId = block.id;
+          drawSiteMap();
+          renderBlockList();
+        };
+        roster.appendChild(item);
+      });
     }
 
-    function onVRSessionEnded() {
-      currentVRSession.removeEventListener('end', onVRSessionEnded);
-      currentVRSession = null;
-      vrBtn.innerHTML = "<span>ENTER VR</span>";
+    document.getElementById('btn-map').onclick = openMapModal;
+    document.getElementById('btn-close-modal').onclick = () => document.getElementById('modal-map').classList.remove('active');
+    document.getElementById('btn-back').onclick = stepBack;
+
+    document.getElementById('btn-teleport-block').onclick = () => {
+      const selectedBlock = ARCH_PROJECT.blocks.find(b => b.id === State.activeBlockId);
+      document.getElementById('modal-map').classList.remove('active');
+      navigateToScene(selectedBlock.defaultSceneId);
+    };
+
+    // Audio Engine Toggle
+    function toggleAudio() {
+      State.audioEnabled = !State.audioEnabled;
+      const label = State.audioEnabled ? "🔊 AUDIO ON" : "🔇 AUDIO OFF";
+      document.getElementById('audio-icon').innerText = label;
     }
-
-    // Meta Quest Controllers & Spatial Ray Pointers
-    function setupVRControllers() {
-      for (let i = 0; i < 2; i++) {
-        const controller = renderer.xr.getController(i);
-        
-        // Visual laser ray for Quest pointing
-        const geometry = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, 0, 0),
-          new THREE.Vector3(0, 0, -4)
-        ]);
-        const material = new THREE.LineBasicMaterial({ color: 0xe25a38, opacity: 0.7, transparent: true });
-        const line = new THREE.Line(geometry, material);
-        controller.add(line);
-
-        controller.addEventListener('selectstart', () => {
-          // Trigger Scene Advance in VR when pulling controller trigger
-          const nextIndex = (activeSceneIndex + 1) % PROJECT_DATA.scenes.length;
-          loadScene(nextIndex);
-        });
-
-        scene.add(controller);
-      }
-    }
+    document.getElementById('btn-audio').onclick = toggleAudio;
 
     /* =========================================================================
-       LOCAL FILE UPLOADER (ENSCAPE 360 TESTING)
+       09. LOCAL ENSCAPE FILE UPLOADER
        ========================================================================= */
     const uploadBtn = document.getElementById('btn-upload');
-    const fileInput = document.getElementById('local-file-input');
+    const fileInput = document.getElementById('file-input');
+    const dropOverlay = document.getElementById('drop-overlay');
 
-    uploadBtn.addEventListener('click', () => fileInput.click());
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => {
+      if (e.target.files[0]) loadCustomEnscape(e.target.files[0]);
+    };
 
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) loadLocalImage(file);
-    });
-
-    // Drag-and-drop listener
-    window.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      document.getElementById('drop-zone-overlay').style.display = 'flex';
-    });
-    window.addEventListener('dragleave', (e) => {
-      if (e.relatedTarget === null) {
-        document.getElementById('drop-zone-overlay').style.display = 'none';
-      }
-    });
+    window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.style.display = 'flex'; });
+    window.addEventListener('dragleave', (e) => { if (e.relatedTarget === null) dropOverlay.style.display = 'none'; });
     window.addEventListener('drop', (e) => {
       e.preventDefault();
-      document.getElementById('drop-zone-overlay').style.display = 'none';
-      if (e.dataTransfer.files.length > 0) {
-        loadLocalImage(e.dataTransfer.files[0]);
-      }
+      dropOverlay.style.display = 'none';
+      if (e.dataTransfer.files[0]) loadCustomEnscape(e.dataTransfer.files[0]);
     });
 
-    function loadLocalImage(file) {
+    function loadCustomEnscape(file) {
       const reader = new FileReader();
-      reader.onload = function(event) {
+      reader.onload = (ev) => {
         const img = new Image();
-        img.onload = function() {
-          if (sphereMaterial.map) sphereMaterial.map.dispose();
-          const texture = new THREE.Texture(img);
-          texture.needsUpdate = true;
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.repeat.x = -1;
-          sphereMaterial.map = texture;
-          sphereMaterial.needsUpdate = true;
-          document.getElementById('ui-project-label').innerText = `CUSTOM ENSCAPE: ${file.name.toUpperCase()}`;
+        img.onload = () => {
+          if (skyMesh.material.map) skyMesh.material.map.dispose();
+          const tex = new THREE.Texture(img);
+          tex.needsUpdate = true;
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.repeat.x = -1;
+          skyMesh.material.map = tex;
+          skyMesh.material.needsUpdate = true;
+          document.getElementById('nav-breadcrumbs').innerText = `CUSTOM ENSCAPE: ${file.name.toUpperCase()}`;
         };
-        img.src = event.target.result;
+        img.src = ev.target.result;
       };
       reader.readAsDataURL(file);
     }
 
     /* =========================================================================
-       INITIALIZATION & ANIMATION RENDER LOOP
+       10. ANIMATION & RENDER LOOP
        ========================================================================= */
-    function initUI() {
-      const container = document.getElementById('scene-selector-container');
-      PROJECT_DATA.scenes.forEach((sc, i) => {
-        const btn = document.createElement('button');
-        btn.className = `scene-node ${i === 0 ? 'active' : ''}`;
-        btn.innerHTML = `
-          <span class="scene-id">${sc.id}</span>
-          <span class="scene-name">${sc.name}</span>
-        `;
-        btn.onclick = () => loadScene(i);
-        container.appendChild(btn);
-      });
-
-      document.getElementById('btn-fullscreen').addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-        } else {
-          document.exitFullscreen();
-        }
-      });
-    }
-
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Unified Three.js / WebXR Animation Loop
     renderer.setAnimationLoop(() => {
       if (!renderer.xr.isPresenting) {
-        // Clamp and update spherical orbit coordinates for desktop/mobile
         lat = Math.max(-85, Math.min(85, lat));
-        phi = THREE.MathUtils.degToRad(90 - lat);
-        theta = THREE.MathUtils.degToRad(lon);
+        const phi = THREE.MathUtils.degToRad(90 - lat);
+        const theta = THREE.MathUtils.degToRad(lon);
 
         camera.target = new THREE.Vector3(
           500 * Math.sin(phi) * Math.cos(theta),
@@ -806,24 +1188,20 @@
           500 * Math.sin(phi) * Math.sin(theta)
         );
         camera.lookAt(camera.target);
+      } else {
+        handleXRInputs();
       }
 
-      // Billboard hotspots to face viewer
-      hotspotGroup.children.forEach(marker => {
-        marker.lookAt(camera.position);
-      });
+      // Billboard interactive hotspots to face camera
+      hotspotGroup.children.forEach(m => m.lookAt(camera.position));
 
       renderer.render(scene, camera);
     });
 
-    // Startup Sequence
+    // Boot
     window.addEventListener('DOMContentLoaded', () => {
-      initUI();
-      loadScene(0);
-      checkWebXRSupport();
-      setTimeout(() => {
-        document.getElementById('loader').classList.add('hidden');
-      }, 300);
+      navigateToScene("scene-01", false);
+      initWebXR();
     });
   </script>
 </body>
