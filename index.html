@@ -1,524 +1,844 @@
-{
-  "id": "poorna-market",
-  "name": "Poorna Market Redevelopment",
-  "description": "Comprehensive urban market renewal and public market infrastructure.",
-  "metadata": {
-    "author": "Architecture Studio",
-    "location": "Visakhapatnam, India",
-    "totalSiteArea": "14,500 m²"
-  },
-  "model": {
-    "format": "glb",
-    "url": "/models/poorna-market.glb",
-    "initialCamera": {
-      "position": [45.0, 30.0, 60.0],
-      "target": [0.0, 0.0, 0.0],
-      "fov": 45
-    },
-    "dracoUrl": "https://www.gstatic.com/draco/versioned/decoders/1.5.6/",
-    "ktx2Url": "/basis/"
-  },
-  "blocks": [
-    {
-      "id": "block-puja",
-      "modelObjectId": "block-puja",
-      "name": "Puja Market",
-      "type": "Retail / Cultural",
-      "level": "Ground Floor",
-      "area": "1,850 m²",
-      "description": "Traditional flower, incense, and ritual goods market hall.",
-      "defaultSceneId": "puja-entrance",
-      "scenes": ["puja-entrance", "puja-interior"],
-      "focusOffset": [0, 8, 18]
-    },
-    {
-      "id": "block-meat",
-      "modelObjectId": "block-meat",
-      "name": "Meat Market",
-      "type": "Perishables / Cold Chain",
-      "level": "Ground Floor & Basement",
-      "area": "2,400 m²",
-      "description": "Climate-controlled wet market block with dedicated logistics bays.",
-      "defaultSceneId": "meat-entrance",
-      "scenes": ["meat-entrance", "meat-interior"],
-      "focusOffset": [0, 10, 22]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Architectural VR & 3D Model Explorer</title>
+  <style>
+    :root {
+      --bg-dark: #0f1115;
+      --panel-bg: rgba(22, 27, 34, 0.85);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --accent: #00e5ff;
+      --accent-hover: #00b4cc;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --danger: #f85149;
     }
-  ],
-  "scenes": [
-    {
-      "id": "puja-entrance",
-      "name": "Puja Market Main Entrance",
-      "panorama": "/panoramas/puja-entrance.jpg",
-      "parentBlockId": "block-puja",
-      "initialOrientation": { "yaw": 0, "pitch": 0 },
-      "navLinks": [
-        { "targetSceneId": "puja-interior", "position": [10, -1, 5], "label": "Enter Market Hall" },
-        { "targetSceneId": "central-street", "position": [-8, 0, -10], "label": "Central Street" }
-      ]
-    },
-    {
-      "id": "meat-entrance",
-      "name": "Meat Market Plaza",
-      "panorama": "/panoramas/meat-entrance.jpg",
-      "parentBlockId": "block-meat",
-      "initialOrientation": { "yaw": 90, "pitch": 0 },
-      "navLinks": [
-        { "targetSceneId": "central-street", "position": [0, 0, 12], "label": "Back to Central Street" }
-      ]
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
     }
-  ]
-}
-[SketchUp .SKP]
-       │ 1. Clean unused components, purge layers, collapse sub-groups
-       ▼
-[Export .OBJ / .DAE or native .GLB plugin]
-       │ 2. Ensure each block group has a clean identifier (e.g., "block-puja")
-       ▼
-[glTF-Transform / Blender CLI]
-       │ 3. Bake transforms, merge static draw calls, optimize geometry
-       ▼
-[Draco + KTX2 / Basis Universal Compression]
-       ▼
-[Final Web-Ready .GLB (< 25 MB for Meta Quest standalone memory targets)]
-  #!/usr/bin/env bash
-# Using @gltf-transform/cli for automated cleanup
-gltf-transform prune input.glb temp.glb
-gltf-transform dedup temp.glb temp.glb
-gltf-transform weld --tolerance 0.0001 temp.glb temp.glb
-gltf-transform draco temp.glb optimized-model.glb --method edgebreaker
-  import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import gsap from 'gsap';
 
-export class ArchitecturalApp {
-  constructor(canvasContainer, projectData) {
-    this.container = canvasContainer;
-    this.project = projectData;
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-main);
+    }
 
-    this.currentMode = 'MODEL'; // 'MODEL' | '360'
-    this.selectedBlock = null;
-    this.intersectableMeshes = [];
-    this.blockMap = new Map();
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
 
-    this.initEngine();
-    this.setupLighting();
-    this.setupControls();
-    this.setupRaycasting();
-    this.setupWebXR();
-    this.buildPanoramaRig();
-    this.loadProjectModel();
+    /* UI Overlay */
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
 
-    window.addEventListener('resize', this.onResize.bind(this));
-    this.renderer.setAnimationLoop(this.render.bind(this));
-  }
+    .interactive {
+      pointer-events: auto;
+    }
 
-  initEngine() {
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x121418);
+    /* Top Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      padding: 12px 24px;
+      border-radius: 12px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
 
-    this.camera = new THREE.PerspectiveCamera(
-      45,
-      this.container.clientWidth / this.container.clientHeight,
-      0.1,
-      1000
-    );
-    const initCam = this.project.model.initialCamera.position;
-    this.camera.position.set(...initCam);
+    .brand-title h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.xr.enabled = true;
-    this.container.appendChild(this.renderer.domElement);
+    .status-badge {
+      font-size: 0.7rem;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent);
+      padding: 3px 8px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      font-weight: 600;
+    }
 
-    // Highlighting Material Clone Stash
-    this.originalMaterials = new Map();
-    this.highlightMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00e5ff,
-      emissive: 0x004466,
-      roughness: 0.2,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.85
-    });
-  }
+    .nav-modes {
+      display: flex;
+      gap: 8px;
+    }
 
-  setupLighting() {
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(this.ambientLight);
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
 
-    this.sunLight = new THREE.DirectionalLight(0xfff8ee, 1.8);
-    this.sunLight.position.set(50, 80, 40);
-    this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
-    this.sunLight.shadow.bias = -0.0001;
-    this.scene.add(this.sunLight);
-  }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
 
-  setupControls() {
-    this.orbit = new OrbitControls(this.camera, this.renderer.domElement);
-    this.orbit.enableDamping = true;
-    this.orbit.dampingFactor = 0.05;
-    this.orbit.maxPolarAngle = Math.PI / 2 - 0.02; // Restrict underground camera dip
-    this.orbit.target.set(...this.project.model.initialCamera.target);
-  }
+    .btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
 
-  setupRaycasting() {
-    this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2();
+    /* Block Information Drawer */
+    #info-panel {
+      position: absolute;
+      right: 20px;
+      top: 90px;
+      width: 340px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      transform: translateX(400px);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
 
-    this.container.addEventListener('pointerdown', (e) => {
-      this.pointerStartX = e.clientX;
-      this.pointerStartY = e.clientY;
-    });
+    #info-panel.visible {
+      transform: translateX(0);
+    }
 
-    this.container.addEventListener('pointerup', (e) => {
-      // Disregard drags to allow clean OrbitControls panning
-      const diffX = Math.abs(e.clientX - this.pointerStartX);
-      const diffY = Math.abs(e.clientY - this.pointerStartY);
-      if (diffX > 5 || diffY > 5) return;
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
 
-      const rect = this.container.getBoundingClientRect();
-      this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    .panel-tag {
+      font-size: 0.75rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
 
-      this.raycastCheck(this.mouse, this.camera);
-    });
-  }
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+    }
 
-  buildPanoramaRig() {
-    const sphereGeo = new THREE.SphereGeometry(500, 60, 40);
-    sphereGeo.scale(-1, 1, 1); // Invert faces inward
-    this.panoMaterial = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0,
-      visible: false
-    });
-    this.panoSphere = new THREE.Mesh(sphereGeo, this.panoMaterial);
-    this.panoSphere.renderOrder = -1;
-    this.scene.add(this.panoSphere);
-    this.textureLoader = new THREE.TextureLoader();
-  }
+    .close-btn:hover {
+      color: var(--text-main);
+    }
 
-  loadProjectModel() {
-    this.updateLoadingUI(0, 'Initializing 3D Pipeline...');
+    .panel-body h2 {
+      font-size: 1.35rem;
+      margin-bottom: 8px;
+    }
 
-    const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath(this.project.model.dracoUrl);
+    .panel-body p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-bottom: 16px;
+    }
 
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.setDRACOLoader(dracoLoader);
+    .meta-specs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--panel-border);
+      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 20px;
+    }
 
-    gltfLoader.load(
-      this.project.model.url,
-      (gltf) => {
-        this.modelRoot = gltf.scene;
-        this.scene.add(this.modelRoot);
+    .meta-spec-item span {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
 
-        // Map blocks to mesh objects via metadata IDs
-        this.project.blocks.forEach((blockDef) => {
-          this.blockMap.set(blockDef.modelObjectId, blockDef);
+    .meta-spec-item strong {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .action-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    .action-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Bottom Control Bar */
+    footer {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 auto;
+    }
+
+    .control-deck {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      padding: 8px 14px;
+      border-radius: 30px;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Loading and Notification Modal */
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 17, 21, 0.9);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.4s ease;
+    }
+
+    .loader-box {
+      width: 320px;
+      text-align: center;
+    }
+
+    .loader-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+      color: var(--text-muted);
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.2s ease;
+    }
+
+    .loader-status {
+      font-size: 0.8rem;
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    /* Standard WebXR Button Overrides */
+    #VRButton {
+      position: absolute !important;
+      bottom: 24px !important;
+      left: 24px !important;
+      background: rgba(22, 27, 34, 0.9) !important;
+      border: 1px solid var(--accent) !important;
+      color: var(--accent) !important;
+      font-family: inherit !important;
+      font-size: 0.8rem !important;
+      text-transform: uppercase !important;
+      font-weight: 700 !important;
+      border-radius: 8px !important;
+      padding: 10px 18px !important;
+      z-index: 20 !important;
+    }
+  </style>
+
+  <!-- Import maps polyfill for Three.js ES Modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="webgl-container"></div>
+
+  <div id="ui-overlay">
+    <header class="interactive">
+      <div class="brand-title">
+        <h1 id="project-title">Poorna Market</h1>
+        <span class="status-badge" id="mode-badge">3D Model</span>
+      </div>
+      <nav class="nav-modes">
+        <button class="btn active" id="btn-mode-model">3D Model</button>
+        <button class="btn" id="btn-mode-360">360° Tour</button>
+        <button class="btn" id="btn-mode-reset">Reset View</button>
+      </nav>
+    </header>
+
+    <aside id="info-panel" class="interactive">
+      <div class="panel-header">
+        <span class="panel-tag" id="panel-tag">Block Node</span>
+        <button class="close-btn" id="btn-close-panel">&times;</button>
+      </div>
+      <div class="panel-body">
+        <h2 id="panel-name">Market Block</h2>
+        <p id="panel-desc">Block architectural details and spatial function description.</p>
+        <div class="meta-specs">
+          <div class="meta-spec-item">
+            <span>Type</span>
+            <strong id="panel-type">Retail</strong>
+          </div>
+          <div class="meta-spec-item">
+            <span>Area</span>
+            <strong id="panel-area">1,200 m²</strong>
+          </div>
+        </div>
+        <button class="action-btn" id="btn-enter-block-360">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+            <path d="M2 12h20"></path>
+          </svg>
+          Explore in 360°
+        </button>
+      </div>
+    </aside>
+
+    <footer class="interactive">
+      <div class="control-deck">
+        <button class="btn" id="btn-fullscreen">Fullscreen</button>
+        <button class="btn" id="btn-toggle-wireframe">Wireframe</button>
+      </div>
+    </footer>
+  </div>
+
+  <div id="loading-overlay">
+    <div class="loader-box">
+      <div class="loader-title" id="loader-title">Loading Environment</div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+      <div class="loader-status" id="loader-status">0%</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+    import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+    // 01 — PROJECT REPOSITORY / DATABASE MOCK
+    const PROJECT_CONFIG = {
+      id: "poorna-market",
+      name: "Poorna Market Redevelopment",
+      modelUrl: "/models/poorna-market.glb", // Point to real GLB if available
+      initialCamera: { x: 40, y: 28, z: 45, tx: 0, ty: 2, tz: 0 },
+      blocks: [
+        {
+          id: "block-puja",
+          name: "Puja Market",
+          type: "Retail / Traditional",
+          area: "1,850 m²",
+          desc: "Multi-level cultural market hall for ritual goods, flowers, and incense.",
+          sceneId: "puja-scene",
+          color: 0xe67e22,
+          bounds: { x: -14, y: 3, z: -8, w: 10, h: 6, d: 14 }
+        },
+        {
+          id: "block-meat",
+          name: "Meat & Fish Market",
+          type: "Perishables / Cold-Chain",
+          area: "2,400 m²",
+          desc: "Hygienic, climate-controlled retail spaces with specialized drainage.",
+          sceneId: "meat-scene",
+          color: 0xc0392b,
+          bounds: { x: 12, y: 4, z: -6, w: 12, h: 8, d: 16 }
+        },
+        {
+          id: "block-vegetable",
+          name: "Vegetable Terminal",
+          type: "Wholesale / Retail",
+          area: "3,100 m²",
+          desc: "High-volume naturally ventilated market hall with direct logistics docks.",
+          sceneId: "vegetable-scene",
+          color: 0x27ae60,
+          bounds: { x: 0, y: 3.5, z: 12, w: 22, h: 7, d: 12 }
+        }
+      ],
+      scenes: {
+        "puja-scene": {
+          name: "Puja Market Plaza",
+          color: 0x4a2810 // Procedural sky color fallback
+        },
+        "meat-scene": {
+          name: "Meat Logistics Yard",
+          color: 0x1f2421
+        },
+        "vegetable-scene": {
+          name: "Vegetable Trading Floor",
+          color: 0x1a3323
+        }
+      }
+    };
+
+    class ArchitectureViewer {
+      constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.mode = 'MODEL'; // 'MODEL' | '360'
+        this.selectedBlock = null;
+        this.intersectableObjects = [];
+        this.blockMeshes = new Map();
+
+        this.initEngine();
+        this.initLighting();
+        this.initEnvironment();
+        this.initControls();
+        this.initPanoRig();
+        this.initWebXR();
+        this.initRaycasting();
+        this.bindUI();
+
+        this.loadArchitecture();
+        this.animate = this.animate.bind(this);
+        this.renderer.setAnimationLoop(this.animate);
+      }
+
+      initEngine() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0f1115);
+
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera.position.set(
+          PROJECT_CONFIG.initialCamera.x,
+          PROJECT_CONFIG.initialCamera.y,
+          PROJECT_CONFIG.initialCamera.z
+        );
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.xr.enabled = true;
+        this.container.appendChild(this.renderer.domElement);
+
+        window.addEventListener('resize', this.onResize.bind(this));
+      }
+
+      initLighting() {
+        this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x333940, 0.8);
+        this.scene.add(this.hemiLight);
+
+        this.dirLight = new THREE.DirectionalLight(0xfff5e6, 1.5);
+        this.dirLight.position.set(45, 60, 30);
+        this.dirLight.castShadow = true;
+        this.dirLight.shadow.mapSize.width = 2048;
+        this.dirLight.shadow.mapSize.height = 2048;
+        this.dirLight.shadow.camera.near = 0.5;
+        this.dirLight.shadow.camera.far = 200;
+        const d = 35;
+        this.dirLight.shadow.camera.left = -d;
+        this.dirLight.shadow.camera.right = d;
+        this.dirLight.shadow.camera.top = d;
+        this.dirLight.shadow.camera.bottom = -d;
+        this.scene.add(this.dirLight);
+      }
+
+      initEnvironment() {
+        // Architectural Ground Plane Grid
+        const grid = new THREE.GridHelper(120, 60, 0x00e5ff, 0x21262d);
+        grid.position.y = -0.01;
+        this.scene.add(grid);
+
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x12151a, roughness: 0.9, metalness: 0.1 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        this.scene.add(ground);
+      }
+
+      initControls() {
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.maxPolarAngle = Math.PI / 2 - 0.01; // Block clipping beneath ground
+        this.controls.target.set(
+          PROJECT_CONFIG.initialCamera.tx,
+          PROJECT_CONFIG.initialCamera.ty,
+          PROJECT_CONFIG.initialCamera.tz
+        );
+      }
+
+      initPanoRig() {
+        // Inverted sphere for 360° equirectangular projection
+        const sphereGeo = new THREE.SphereGeometry(60, 48, 32);
+        sphereGeo.scale(-1, 1, 1);
+        this.panoMaterial = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          visible: false,
+          side: THREE.FrontSide
+        });
+        this.panoSphere = new THREE.Mesh(sphereGeo, this.panoMaterial);
+        this.scene.add(this.panoSphere);
+      }
+
+      initWebXR() {
+        document.body.appendChild(VRButton.createButton(this.renderer));
+
+        // XR Controller Line Visuals
+        const controllerModelFactory = new XRControllerModelFactory();
+        for (let i = 0; i < 2; i++) {
+          const controller = this.renderer.xr.getController(i);
+          controller.addEventListener('selectstart', this.onXRSelect.bind(this, controller));
+          this.scene.add(controller);
+
+          const grip = this.renderer.xr.getControllerGrip(i);
+          grip.add(controllerModelFactory.createControllerModel(grip));
+          this.scene.add(grip);
+
+          const rayGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, -8)
+          ]);
+          const rayMat = new THREE.LineBasicMaterial({ color: 0x00e5ff });
+          controller.add(new THREE.Line(rayGeo, rayMat));
+        }
+      }
+
+      initRaycasting() {
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
+        this.container.addEventListener('pointerdown', (e) => {
+          this.pX = e.clientX;
+          this.pY = e.clientY;
         });
 
-        this.modelRoot.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            this.originalMaterials.set(child.uuid, child.material);
+        this.container.addEventListener('pointerup', (e) => {
+          // Reject drag gestures
+          if (Math.abs(e.clientX - this.pX) > 4 || Math.abs(e.clientY - this.pY) > 4) return;
+          this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+          this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+          this.processRaycast(this.mouse, this.camera);
+        });
+      }
 
-            // Determine if mesh or ancestor correlates with block map
-            let current = child;
-            let mappedBlock = null;
-            while (current && current !== this.modelRoot) {
-              if (this.blockMap.has(current.name)) {
-                mappedBlock = this.blockMap.get(current.name);
-                break;
+      loadArchitecture() {
+        this.updateLoading(30, 'Searching for Project Geometry...');
+        this.modelGroup = new THREE.Group();
+        this.scene.add(this.modelGroup);
+
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        gltfLoader.load(
+          PROJECT_CONFIG.modelUrl,
+          (gltf) => {
+            this.updateLoading(85, 'Parsing Meshes...');
+            this.modelGroup.add(gltf.scene);
+            this.bindGLTFBlocks(gltf.scene);
+            this.finishLoading();
+          },
+          (xhr) => {
+            if (xhr.lengthComputable) {
+              const p = Math.round((xhr.loaded / xhr.total) * 100);
+              this.updateLoading(p, `Loading Assets: ${p}%`);
+            }
+          },
+          () => {
+            // Fallback generation: Builds architectural massing if external .GLB file is unavailable
+            this.buildProceduralMassing();
+            this.finishLoading();
+          }
+        );
+      }
+
+      buildProceduralMassing() {
+        PROJECT_CONFIG.blocks.forEach((block) => {
+          const b = block.bounds;
+          const geo = new THREE.BoxGeometry(b.w, b.h, b.d);
+          const mat = new THREE.MeshStandardMaterial({
+            color: block.color,
+            roughness: 0.35,
+            metalness: 0.15,
+            wireframe: false
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(b.x, b.y, b.z);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          mesh.userData = { blockId: block.id, originalColor: block.color };
+
+          this.modelGroup.add(mesh);
+          this.intersectableObjects.push(mesh);
+          this.blockMeshes.set(block.id, mesh);
+        });
+      }
+
+      bindGLTFBlocks(scene) {
+        scene.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+            PROJECT_CONFIG.blocks.forEach((block) => {
+              if (node.name.toLowerCase().includes(block.id.toLowerCase())) {
+                node.userData.blockId = block.id;
+                this.intersectableObjects.push(node);
+                this.blockMeshes.set(block.id, node);
               }
-              current = current.parent;
-            }
+            });
+          }
+        });
+      }
 
-            if (mappedBlock) {
-              child.userData.blockId = mappedBlock.id;
-              this.intersectableMeshes.push(child);
-            }
+      processRaycast(coords, cameraInstance) {
+        if (this.mode !== 'MODEL') return;
+        this.raycaster.setFromCamera(coords, cameraInstance);
+        const hits = this.raycaster.intersectObjects(this.intersectableObjects, false);
+
+        if (hits.length > 0) {
+          const blockId = hits[0].object.userData.blockId;
+          this.selectBlock(blockId);
+        } else {
+          this.clearSelection();
+        }
+      }
+
+      onXRSelect(controller) {
+        if (this.mode !== 'MODEL') return;
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+        this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+        const hits = this.raycaster.intersectObjects(this.intersectableObjects, false);
+        if (hits.length > 0) {
+          const blockId = hits[0].object.userData.blockId;
+          this.selectBlock(blockId);
+        }
+      }
+
+      selectBlock(blockId) {
+        this.clearSelection();
+        const block = PROJECT_CONFIG.blocks.find(b => b.id === blockId);
+        if (!block) return;
+
+        this.selectedBlock = block;
+        const mesh = this.blockMeshes.get(blockId);
+
+        if (mesh) {
+          mesh.material.emissive = new THREE.Color(0x00e5ff);
+          mesh.material.emissiveIntensity = 0.5;
+
+          // Align Camera target to architectural block
+          this.controls.target.lerp(mesh.position, 0.8);
+        }
+
+        this.renderPanel(block);
+      }
+
+      clearSelection() {
+        if (!this.selectedBlock) return;
+        const mesh = this.blockMeshes.get(this.selectedBlock.id);
+        if (mesh) {
+          mesh.material.emissive = new THREE.Color(0x000000);
+          mesh.material.emissiveIntensity = 0;
+        }
+        this.selectedBlock = null;
+        document.getElementById('info-panel').classList.remove('visible');
+      }
+
+      setMode(mode, targetSceneId = null) {
+        this.mode = mode;
+        const badge = document.getElementById('mode-badge');
+        const btnModel = document.getElementById('btn-mode-model');
+        const btn360 = document.getElementById('btn-mode-360');
+
+        if (mode === 'MODEL') {
+          this.panoSphere.visible = false;
+          this.modelGroup.visible = true;
+          this.controls.enableZoom = true;
+          this.controls.autoRotate = false;
+          this.resetCamera();
+
+          badge.textContent = "3D Model";
+          badge.style.color = "var(--accent)";
+          btnModel.classList.add('active');
+          btn360.classList.remove('active');
+        } else if (mode === '360') {
+          this.clearSelection();
+          this.modelGroup.visible = false;
+          this.panoSphere.visible = true;
+          this.controls.enableZoom = false; // Preserve field of view inside 360 sphere
+          this.controls.autoRotate = true;
+          this.controls.autoRotateSpeed = 0.4;
+
+          const sceneData = PROJECT_CONFIG.scenes[targetSceneId] || PROJECT_CONFIG.scenes["puja-scene"];
+          this.panoMaterial.color.setHex(sceneData.color);
+
+          this.camera.position.set(0, 0, 0.1);
+          this.controls.target.set(0, 0, 0);
+
+          badge.textContent = `360° VR: ${sceneData.name}`;
+          badge.style.color = "#00ff88";
+          btn360.classList.add('active');
+          btnModel.classList.remove('active');
+        }
+      }
+
+      resetCamera() {
+        this.camera.position.set(
+          PROJECT_CONFIG.initialCamera.x,
+          PROJECT_CONFIG.initialCamera.y,
+          PROJECT_CONFIG.initialCamera.z
+        );
+        this.controls.target.set(
+          PROJECT_CONFIG.initialCamera.tx,
+          PROJECT_CONFIG.initialCamera.ty,
+          PROJECT_CONFIG.initialCamera.tz
+        );
+      }
+
+      renderPanel(block) {
+        document.getElementById('panel-tag').textContent = block.id;
+        document.getElementById('panel-name').textContent = block.name;
+        document.getElementById('panel-desc').textContent = block.desc;
+        document.getElementById('panel-type').textContent = block.type;
+        document.getElementById('panel-area').textContent = block.area;
+        document.getElementById('info-panel').classList.add('visible');
+      }
+
+      bindUI() {
+        document.getElementById('btn-mode-model').addEventListener('click', () => this.setMode('MODEL'));
+        document.getElementById('btn-mode-360').addEventListener('click', () => this.setMode('360'));
+        document.getElementById('btn-mode-reset').addEventListener('click', () => this.resetCamera());
+        document.getElementById('btn-close-panel').addEventListener('click', () => this.clearSelection());
+
+        document.getElementById('btn-enter-block-360').addEventListener('click', () => {
+          if (this.selectedBlock) {
+            this.setMode('360', this.selectedBlock.sceneId);
           }
         });
 
-        this.hideLoadingUI();
-      },
-      (xhr) => {
-        if (xhr.lengthComputable) {
-          const percent = Math.round((xhr.loaded / xhr.total) * 100);
-          this.updateLoadingUI(percent, `Loading Model: ${percent}%`);
-        }
-      },
-      (error) => {
-        this.showErrorUI('Model could not be loaded. Verify file path and network connection.');
-      }
-    );
-  }
-
-  raycastCheck(coords, cameraInstance) {
-    if (this.currentMode !== 'MODEL') return;
-
-    this.raycaster.setFromCamera(coords, cameraInstance);
-    const intersects = this.raycaster.intersectObjects(this.intersectableMeshes, false);
-
-    if (intersects.length > 0) {
-      const hitMesh = intersects[0].object;
-      const blockId = hitMesh.userData.blockId;
-      if (blockId) {
-        this.selectBlock(blockId);
-      }
-    } else {
-      this.clearSelection();
-    }
-  }
-
-  selectBlock(blockId) {
-    const blockData = this.project.blocks.find((b) => b.id === blockId);
-    if (!blockData) return;
-
-    this.clearSelection();
-    this.selectedBlock = blockData;
-
-    // Highlight linked sub-meshes
-    const targetMeshes = [];
-    this.modelRoot.traverse((node) => {
-      if (node.isMesh && node.userData.blockId === blockId) {
-        node.material = this.highlightMaterial;
-        targetMeshes.push(node);
-      }
-    });
-
-    // Compute bounding center to focus camera
-    if (targetMeshes.length > 0) {
-      const box = new THREE.Box3();
-      targetMeshes.forEach((m) => box.expandByObject(m));
-      const center = box.getCenter(new THREE.Vector3());
-
-      const offset = blockData.focusOffset || [15, 15, 15];
-      gsap.to(this.camera.position, {
-        x: center.x + offset[0],
-        y: center.y + offset[1],
-        z: center.z + offset[2],
-        duration: 1.2,
-        ease: 'power2.out'
-      });
-
-      gsap.to(this.orbit.target, {
-        x: center.x,
-        y: center.y,
-        z: center.z,
-        duration: 1.2,
-        ease: 'power2.out',
-        onUpdate: () => this.orbit.update()
-      });
-    }
-
-    this.renderInfoPanel(blockData);
-  }
-
-  clearSelection() {
-    if (!this.selectedBlock) return;
-    this.modelRoot.traverse((node) => {
-      if (node.isMesh && this.originalMaterials.has(node.uuid)) {
-        node.material = this.originalMaterials.get(node.uuid);
-      }
-    });
-    this.selectedBlock = null;
-    this.closeInfoPanel();
-  }
-
-  enterPanorama(sceneId) {
-    const targetScene = this.project.scenes.find((s) => s.id === sceneId);
-    if (!targetScene) return;
-
-    this.updateLoadingUI(50, 'Loading 360° Scene...');
-    this.textureLoader.load(targetScene.panorama, (texture) => {
-      texture.mapping = THREE.EquirectangularReflectionMapping;
-      texture.colorSpace = THREE.SRGBColorSpace;
-
-      this.panoMaterial.map = texture;
-      this.panoMaterial.needsUpdate = true;
-      this.panoMaterial.visible = true;
-
-      // Crossfade: Hide 3D model, blend in panoramic sphere
-      gsap.to(this.modelRoot.position, { y: -100, duration: 0.6, ease: 'power2.in' });
-      gsap.to(this.panoMaterial, {
-        opacity: 1,
-        duration: 0.8,
-        onComplete: () => {
-          this.currentMode = '360';
-          this.modelRoot.visible = false;
-          this.camera.position.set(0, 0, 0.1);
-          this.orbit.target.set(0, 0, 0);
-          this.orbit.enableZoom = false; // Disable zooming inside spherical node
-          this.hideLoadingUI();
-          this.updateNavUIForPanorama(targetScene);
-        }
-      });
-    });
-  }
-
-  returnToModel() {
-    this.updateLoadingUI(80, 'Switching to 3D Model...');
-    this.modelRoot.visible = true;
-    this.orbit.enableZoom = true;
-
-    gsap.to(this.panoMaterial, {
-      opacity: 0,
-      duration: 0.6,
-      onComplete: () => {
-        this.panoMaterial.visible = false;
-        this.currentMode = 'MODEL';
-        const initCam = this.project.model.initialCamera.position;
-        const initTarget = this.project.model.initialCamera.target;
-
-        gsap.to(this.camera.position, { x: initCam[0], y: initCam[1], z: initCam[2], duration: 1.0 });
-        gsap.to(this.modelRoot.position, { y: 0, duration: 0.8 });
-        gsap.to(this.orbit.target, {
-          x: initTarget[0],
-          y: initTarget[1],
-          z: initTarget[2],
-          duration: 1.0,
-          onUpdate: () => this.orbit.update()
+        document.getElementById('btn-toggle-wireframe').addEventListener('click', () => {
+          this.blockMeshes.forEach(mesh => {
+            mesh.material.wireframe = !mesh.material.wireframe;
+          });
         });
 
-        this.hideLoadingUI();
-        this.updateNavUIForModel();
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+        });
       }
+
+      updateLoading(percent, text) {
+        document.getElementById('progress-bar').style.width = `${percent}%`;
+        document.getElementById('loader-status').textContent = `${percent}%`;
+        document.getElementById('loader-title').textContent = text;
+      }
+
+      finishLoading() {
+        this.updateLoading(100, 'Ready');
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 400);
+      }
+
+      onResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      animate() {
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+    // Initialize application instance on DOM load
+    window.addEventListener('DOMContentLoaded', () => {
+      new ArchitectureViewer('webgl-container');
     });
-  }
-
-  setupWebXR() {
-    const vrButton = VRButton.createButton(this.renderer);
-    document.body.appendChild(vrButton);
-
-    const controllerModelFactory = new XRControllerModelFactory();
-    this.controller1 = this.renderer.xr.getController(0);
-    this.controller2 = this.renderer.xr.getController(1);
-
-    // Controller Ray Pointer Visual
-    const pointerGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, 0, -5)
-    ]);
-    const pointerMat = new THREE.LineBasicMaterial({ color: 0x00e5ff });
-    const pointerLine = new THREE.Line(pointerGeo, pointerMat);
-
-    this.controller1.add(pointerLine.clone());
-    this.controller2.add(pointerLine);
-
-    this.scene.add(this.controller1);
-    this.scene.add(this.controller2);
-
-    // XR Trigger Select Handling
-    this.controller1.addEventListener('selectstart', () => this.handleXRSelect(this.controller1));
-    this.controller2.addEventListener('selectstart', () => this.handleXRSelect(this.controller2));
-  }
-
-  handleXRSelect(controller) {
-    if (this.currentMode !== 'MODEL') return;
-
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-
-    this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-
-    const intersects = this.raycaster.intersectObjects(this.intersectableMeshes, false);
-    if (intersects.length > 0) {
-      const blockId = intersects[0].object.userData.blockId;
-      if (blockId) this.selectBlock(blockId);
-    }
-  }
-
-  render() {
-    if (this.renderer.xr.isPresenting) {
-      // Custom XR frame updates (controller thumbstick locomotion/teleport)
-    } else {
-      this.orbit.update();
-    }
-    this.renderer.render(this.scene, this.camera);
-  }
-
-  onResize() {
-    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-  }
-
-  // UI Event Emitting & Hooks
-  updateLoadingUI(pct, label) { /* Dispatches progress to DOM */ }
-  hideLoadingUI() { /* Hides DOM loader */ }
-  showErrorUI(msg) { /* Renders modal with [RETRY] */ }
-  renderInfoPanel(block) { /* Shows floating block metadata card with [ENTER 360°] button */ }
-  closeInfoPanel() { /* Hides floating info card */ }
-  updateNavUIForPanorama(scene) { /* Mounts 'Return to 3D Model' and directional pano arrows */ }
-  updateNavUIForModel() { /* Restores default model toolbar */ }
-}
-  <!-- Main Application Floating Layer -->
-<div id="app-overlay">
-  <!-- Top Navigation & Project Title -->
-  <header class="project-header">
-    <div class="project-title">
-      <h1>Poorna Market Redevelopment</h1>
-      <span class="badge" id="mode-indicator">3D MODEL VIEW</span>
-    </div>
-    <div class="mode-toggles">
-      <button class="nav-btn active" id="btn-mode-model">3D Model</button>
-      <button class="nav-btn" id="btn-mode-360">360° Tour</button>
-      <button class="nav-btn" id="btn-mode-map">Site Map</button>
-      <button class="nav-btn" id="btn-mode-info">Project Info</button>
-    </div>
-  </header>
-
-  <!-- Interactive Selection Drawer -->
-  <aside id="block-info-panel" class="info-drawer hidden">
-    <div class="drawer-header">
-      <span class="block-id-tag" id="panel-block-id">BLOCK C</span>
-      <button class="close-btn" id="btn-close-drawer">×</button>
-    </div>
-    <h2 id="panel-block-name">Meat Market</h2>
-    <div class="meta-grid">
-      <div class="meta-item"><span>TYPE</span><strong id="panel-block-type">Perishables</strong></div>
-      <div class="meta-item"><span>LEVEL</span><strong id="panel-block-level">Ground Floor</strong></div>
-      <div class="meta-item"><span>AREA</span><strong id="panel-block-area">2,400 m²</strong></div>
-    </div>
-    <p id="panel-block-desc">Climate-controlled wet market block with dedicated logistics bays.</p>
-    <div class="drawer-actions">
-      <button class="action-btn primary" id="btn-enter-360">Explore in 360° VR</button>
-      <button class="action-btn secondary" id="btn-focus-cam">Isolate Block</button>
-    </div>
-  </aside>
-
-  <!-- Bottom Control Deck -->
-  <footer class="controls-deck">
-    <div class="tool-group">
-      <button class="tool-btn" id="tool-reset" title="Reset View">Reset</button>
-      <button class="tool-btn" id="tool-layers" title="Toggle Layers">Layers</button>
-      <button class="tool-btn" id="tool-fullscreen" title="Fullscreen">Fullscreen</button>
-    </div>
-  </footer>
-
-  <!-- Loading Screen -->
-  <div id="loading-screen" class="loading-overlay">
-    <div class="loader-box">
-      <h3>LOADING ARCHITECTURAL MODEL</h3>
-      <div class="progress-bar-track">
-        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
-      </div>
-      <span id="loading-status-text">78%</span>
-    </div>
-  </div>
-</div>
+  </script>
+</body>
+</html>
