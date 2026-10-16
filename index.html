@@ -263,13 +263,13 @@ const sphere=new THREE.Mesh(gSph,mat);sc.add(sphere);
 function resize(){const b=$('#stage');if(R.xr.isPresenting||!b.clientWidth)return;R.setSize(b.clientWidth,b.clientHeight,false);cam.aspect=b.clientWidth/b.clientHeight;cam.updateProjectionMatrix()}
 new ResizeObserver(resize).observe($('#stage'));addEventListener('resize',resize);
 
-let yaw=0,pitch=0,drag=null;const gl=$('#gl');
+let yaw=0,pitch=-.32,drag=null;const gl=$('#gl');
 let sx=0,sy=0;
 gl.onpointerdown=e=>{sx=e.clientX;sy=e.clientY;drag={x:e.clientX,y:e.clientY};gl.setPointerCapture(e.pointerId)};
 /* Street View style floor arrows: one per linked scene, pointing the way the map pins lie (map up = straight ahead) */
 const ray=new THREE.Raycaster(),aGrp=new THREE.Group();sc.add(aGrp);
 const sh=new THREE.Shape();[[0,.6],[.5,0],[.2,0],[.2,-.5],[-.2,-.5],[-.2,0],[-.5,0]].forEach((p,i)=>i?sh.lineTo(p[0],p[1]):sh.moveTo(p[0],p[1]));
-const arrowGeo=new THREE.ShapeGeometry(sh),outGeo=new THREE.BufferGeometry().setFromPoints(sh.getPoints());
+const discGeo=new THREE.CircleGeometry(.62,48),ringGeo=new THREE.RingGeometry(.56,.62,48),arrowGeo=new THREE.ShapeGeometry(sh),outGeo=new THREE.BufferGeometry().setFromPoints(sh.getPoints());
 function label(t){const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');x.fillStyle='rgba(43,29,79,.85)';x.beginPath();x.roundRect(8,16,496,96,48);x.fill();x.fillStyle='#fff';x.font='bold 54px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(t.length>18?t.slice(0,17)+'…':t,256,66);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));sp.scale.set(1.1,.275,1);sp.renderOrder=7;return sp}
 function buildArrows(){
@@ -277,9 +277,10 @@ function buildArrows(){
   const s=cur();if(!s)return;
   DIRS.forEach(d=>{const t=s.nav[d]&&byId(s.nav[d]);if(!t)return;
     const dx=t.pos.x-s.pos.x,dy=t.pos.y-s.pos.y,th=Math.hypot(dx,dy)>.02?Math.atan2(dx,-dy):{forward:0,right:Math.PI/2,back:Math.PI,left:-Math.PI/2}[d];
-    const m=new THREE.Mesh(arrowGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.92,side:THREE.DoubleSide,depthTest:false}));
-    m.rotation.order='YXZ';m.rotation.set(-Math.PI/2,-th,0);m.position.set(Math.sin(th)*2.6,-1.3,-Math.cos(th)*2.6);m.scale.setScalar(.75);m.renderOrder=5;m.userData.id=t.id;
-    const ol=new THREE.LineLoop(outGeo,new THREE.LineBasicMaterial({color:0x8b5cf6,depthTest:false}));ol.renderOrder=6;m.add(ol);aGrp.add(m);
+    const m=new THREE.Mesh(discGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.5,side:THREE.DoubleSide,depthTest:false}));
+    m.rotation.order='YXZ';m.rotation.set(-Math.PI/2,-th,0);m.position.set(Math.sin(th)*2.6,-1.3,-Math.cos(th)*2.6);m.renderOrder=5;m.userData.id=t.id;
+    const ol=new THREE.LineLoop(outGeo,new THREE.LineBasicMaterial({color:0x8b5cf6,depthTest:false}));ol.renderOrder=8;const ar=new THREE.Mesh(arrowGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.97,side:THREE.DoubleSide,depthTest:false}));ar.scale.setScalar(.5);ar.position.z=.02;ar.renderOrder=7;ar.add(ol);
+    const rg=new THREE.Mesh(ringGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.9,side:THREE.DoubleSide,depthTest:false}));rg.position.z=.01;rg.renderOrder=6;m.add(rg);m.add(ar);aGrp.add(m);
     const sp=label(t.name);sp.position.set(Math.sin(th)*2.6,-.9,-Math.cos(th)*2.6);aGrp.add(sp)})}
 function hitArrow(e){const r=gl.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-((e.clientY-r.top)/r.height)*2+1},cam);return ray.intersectObjects(aGrp.children.filter(o=>o.isMesh))[0]?.object}
 gl.onpointermove=e=>{if(!drag){const h=hitArrow(e);gl.style.cursor=h?'pointer':'grab';aGrp.children.forEach(o=>o.isMesh&&o.material.color.set(o===h?0xffd75e:0xffffff));return}const k=cam.fov/gl.clientHeight*Math.PI/180;yaw+=(e.clientX-drag.x)*k;pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.clientY-drag.y)*k));drag={x:e.clientX,y:e.clientY}};
@@ -329,10 +330,10 @@ $('#all').onclick=()=>{const s=cur();if(!s)return;S.sc.forEach(x=>x.st={...s.st}
 /* ---------- scenes: upload, demo, link ---------- */
 const slug=()=>'s'+(++S.n);
 function add(name,url,pos,nav){const s={id:slug(),name,url,pos,nav:nav||{},st:dstyle()};S.sc.push(s);return s}
-function layout(i,n){const c=Math.ceil(Math.sqrt(Math.max(n,1)));return{x:.15+.7*((i%c)+.5)/c,y:.2+.6*((Math.floor(i/c))+.5)/c}}
+function layout(i,n){return{x:.5,y:n<2?.5:.85-.7*i/(n-1)}}
 async function addFiles(fs){const imgs=[...fs].filter(f=>/^image\//.test(f.type));if(!imgs.length)return toast('Choose JPG, PNG or WebP images');
   const first=!S.sc.length;imgs.forEach((f,i)=>add(f.name&&f.name!=='image.png'?f.name.replace(/\.[^.]+$/,''):'Pasted image '+(S.n+1),URL.createObjectURL(f),layout(S.sc.length+i,S.sc.length+imgs.length)));
-  S.sc.forEach((s,i)=>s.pos=layout(i,S.sc.length));toast(imgs.length+' image'+(imgs.length>1?'s':'')+' added. Use Auto-link or set arrows on the right.');
+  const old=S.sc.length-imgs.length;S.sc.forEach((s,i)=>{s.pos=layout(i,S.sc.length);if(i>=old&&i>0){const p=S.sc[i-1];if(!s.nav.back)s.nav.back=p.id;if(!p.nav.forward)p.nav.forward=s.id}});toast(imgs.length+' image'+(imgs.length>1?'s':'')+' added'+(S.sc.length>1?' and linked in order. Click the floor circles to move.':'. Add one more image to get moving arrows.'));
   if(first||!S.cur)go(S.sc[0].id);else upd()}
 $('#file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
 const dz=$('#studio');dz.ondragover=e=>{e.preventDefault();dz.classList.add('drop')};dz.ondragleave=e=>{if(!dz.contains(e.relatedTarget))dz.classList.remove('drop')};dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drop');addFiles(e.dataTransfer.files)};
