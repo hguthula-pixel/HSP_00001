@@ -1,1236 +1,371 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>ARCHI VR — Architectural Exploration Engine</title>
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Three.js and WebXR polyfills/helpers -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  
-  <style>
-    :root {
-      --bg-dark: #0a0d14;
-      --panel-bg: rgba(15, 23, 42, 0.88);
-      --panel-border: rgba(255, 255, 255, 0.12);
-      --accent-blue: #2563eb;
-      --accent-cyan: #0ea5e9;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-
-    body, html {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: var(--bg-dark);
-      font-family: 'Inter', sans-serif;
-      color: var(--text-main);
-    }
-
-    #webgl-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-      display: block;
-    }
-
-    /* Screen UI Overlay */
-    #ui-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 20px;
-    }
-
-    .interactive {
-      pointer-events: auto;
-    }
-
-    /* Architectural Header */
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border);
-      padding: 12px 24px;
-      border-radius: 12px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .brand-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 700;
-      font-size: 16px;
-      color: #fff;
-    }
-
-    .brand-text h1 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 16px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-
-    .brand-text p {
-      font-size: 11px;
-      color: var(--text-muted);
-      letter-spacing: 0.02em;
-    }
-
-    .nav-tabs {
-      display: flex;
-      gap: 8px;
-    }
-
-    .btn {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--panel-border);
-      color: var(--text-main);
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-    }
-
-    .btn:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    .btn.active {
-      background: var(--accent-blue);
-      border-color: var(--accent-cyan);
-      box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
-    }
-
-    .btn-vr {
-      background: linear-gradient(135deg, #2563eb, #0284c7);
-      border: 1px solid #38bdf8;
-      font-weight: 600;
-    }
-
-    /* Floating Architectural Data Panel */
-    #block-info-drawer {
-      position: absolute;
-      right: 24px;
-      top: 90px;
-      width: 340px;
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border);
-      border-radius: 12px;
-      padding: 20px;
-      display: none;
-      flex-direction: column;
-      gap: 14px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-    }
-
-    #block-info-drawer h2 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    .meta-tag {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 4px;
-      background: rgba(14, 165, 233, 0.15);
-      border: 1px solid rgba(14, 165, 233, 0.3);
-      color: var(--accent-cyan);
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
-
-    .metric-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      background: rgba(0, 0, 0, 0.2);
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .metric-item p:first-child {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .metric-item p:last-child {
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    /* Bottom HUD and Directional Controls */
-    footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      width: 100%;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    /* Directional Cross-Hair Navigation */
-    .d-pad-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border);
-      padding: 12px;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-
-    .d-pad-grid {
-      display: grid;
-      grid-template-columns: 46px 46px 46px;
-      grid-template-rows: 46px 46px 46px;
-      gap: 6px;
-    }
-
-    .d-btn {
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid var(--panel-border);
-      color: var(--text-main);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .d-btn:hover:not(:disabled) {
-      background: var(--accent-blue);
-      border-color: var(--accent-cyan);
-    }
-
-    .d-btn:disabled {
-      opacity: 0.18;
-      cursor: not-allowed;
-      border-color: transparent;
-    }
-
-    .d-btn-center {
-      background: rgba(255, 255, 255, 0.02);
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      color: var(--text-muted);
-      cursor: default;
-    }
-
-    /* 2D Interactive Site Map */
-    .map-card {
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--panel-border);
-      border-radius: 14px;
-      padding: 14px;
-      width: 240px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-
-    .map-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
-
-    #site-map-canvas {
-      width: 100%;
-      height: 160px;
-      background: #06090e;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      cursor: crosshair;
-    }
-
-    /* Modal Styles */
-    .modal-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      z-index: 100;
-      display: none;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-card {
-      background: #0f172a;
-      border: 1px solid var(--panel-border);
-      border-radius: 16px;
-      width: 90%;
-      max-width: 520px;
-      padding: 28px;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
-    }
-
-    .modal-card h3 {
-      font-family: 'Space Grotesk', sans-serif;
-      margin-bottom: 16px;
-    }
-
-    .scene-grid-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 14px;
-      max-height: 280px;
-      overflow-y: auto;
-    }
-
-    .scene-card-item {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .scene-card-item:hover {
-      background: var(--accent-blue);
-    }
-
-    /* Toast Notification */
-    #toast {
-      position: absolute;
-      top: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(14, 165, 233, 0.9);
-      color: #fff;
-      padding: 8px 18px;
-      border-radius: 30px;
-      font-size: 13px;
-      font-weight: 500;
-      display: none;
-      z-index: 200;
-      box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4);
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ARCHI VR</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
+<style>
+:root{--bg:#0d1015;--pn:#151922;--ln:#2a303b;--tx:#eceff4;--mu:#8f98a6;--ac:#8ab4ff;--ak:#0b1630;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#eef0f4;--pn:#fff;--ln:#d3d8e0;--tx:#13161c;--mu:#58616f;--ac:#2955c9;--ak:#fff;color-scheme:light}}
+:root[data-theme="light"]{--bg:#eef0f4;--pn:#fff;--ln:#d3d8e0;--tx:#13161c;--mu:#58616f;--ac:#2955c9;--ak:#fff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 'Space Grotesk',system-ui,sans-serif;overflow:hidden}
+h1,h2,h3,p{margin:0}button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--pn);border:1px solid var(--ln);border-radius:8px;padding:9px 14px;transition:border-color .15s,background .15s}
+button:hover{border-color:var(--ac)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+button:disabled{opacity:.35;cursor:not-allowed;border-color:var(--ln)}
+.pri{background:var(--ac);color:var(--ak);border-color:var(--ac);font-weight:700}
+.screen{display:none;height:100%;overflow:auto}.screen.on{display:flex;flex-direction:column}
+/* start */
+#start{align-items:center;text-align:center;padding:28px 20px 34px;background:radial-gradient(120% 70% at 50% 25%,rgba(138,180,255,.14),transparent 60%)}
+#start .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:100%;max-width:760px}
+#start svg{width:100%;max-height:44vh}
+#start h1{font-size:clamp(40px,9vw,84px);letter-spacing:.04em;font-weight:700;line-height:1}
+#start p{color:var(--mu);font-size:17px}
+#start .pri{padding:15px 54px;font-size:18px;border-radius:999px}
+.drift{animation:drift 7s ease-in-out infinite alternate}@keyframes drift{to{transform:translateY(-8px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+/* guide */
+#guide{padding:22px;align-items:center}.gw{width:100%;max-width:860px;display:flex;flex-direction:column;gap:20px}
+.gh{display:flex;justify-content:space-between;align-items:center}.dots{display:flex;gap:8px}.dots i{width:28px;height:4px;border-radius:2px;background:var(--ln)}.dots i.on{background:var(--ac)}
+.gstep{display:none;flex-direction:column;gap:16px}.gstep.on{display:flex}
+.gstep h2{font-size:30px}.gstep>p{color:var(--mu);max-width:60ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.card{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:14px}.card b{display:block;margin-bottom:4px}.card span{color:var(--mu);font-size:14px}
+.demo{display:grid;grid-template-columns:repeat(3,52px);grid-auto-rows:52px;gap:6px;justify-content:center;margin:6px 0}
+.demo i{display:grid;place-items:center;border:1px solid var(--ln);border-radius:8px;font-style:normal;background:var(--pn);animation:pulse 4s infinite}
+.demo i:nth-child(1){grid-area:1/2;animation-delay:0s}.demo i:nth-child(2){grid-area:2/1;animation-delay:1s}.demo i:nth-child(3){grid-area:2/3;animation-delay:2s}.demo i:nth-child(4){grid-area:3/2;animation-delay:3s}
+@keyframes pulse{0%,20%{background:var(--ac);color:var(--ak)}30%,100%{background:var(--pn);color:var(--tx)}}
+ol.st{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.url{display:flex;gap:8px;align-items:center;background:var(--pn);border:1px solid var(--ln);border-radius:8px;padding:8px 8px 8px 12px;word-break:break-all;font-size:13px}.url span{flex:1}
+#chkout{min-height:24px;color:var(--mu)}.gf{display:flex;justify-content:space-between;gap:10px}
+/* studio */
+#studio.on{display:grid;grid-template-columns:250px minmax(0,1fr) 280px;height:100%;overflow:hidden}
+aside{background:var(--pn);border-right:1px solid var(--ln);padding:14px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+aside.r{border-right:0;border-left:1px solid var(--ln)}
+aside h3{font-size:14px;color:var(--mu);font-weight:500}
+#list{display:flex;flex-direction:column;gap:6px;flex:1;min-height:80px}
+.it{display:flex;align-items:center;gap:8px;border:1px solid var(--ln);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px}.it.on{border-color:var(--ac);background:rgba(138,180,255,.1)}
+.it small{display:block;color:var(--mu);font-size:11px}.it div{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.it button{padding:2px 8px}
+#stage{position:relative;min-height:0;background:#000;overflow:hidden}#gl{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.ov{position:absolute}.top{left:12px;top:12px;display:flex;gap:8px;align-items:center;background:rgba(13,16,21,.72);border:1px solid var(--ln);border-radius:10px;padding:6px 10px;color:#eceff4;backdrop-filter:blur(6px)}
+.top small{display:block;color:#9aa3b2;font-size:11px;line-height:1.2}.top b{font-size:14px}
+#map{right:12px;top:12px;width:168px;height:168px;border:1px solid var(--ln);border-radius:10px;touch-action:none;cursor:pointer}
+.dpad{left:50%;bottom:16px;transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,58px);grid-auto-rows:58px;gap:6px}
+.dpad button{font-size:22px;padding:0;background:rgba(13,16,21,.78);color:#eceff4}.dpad button:not(:disabled):hover{background:var(--ac);color:var(--ak)}
+.dpad [data-d=forward]{grid-area:1/2}.dpad [data-d=left]{grid-area:2/1}.dpad [data-d=right]{grid-area:2/3}.dpad [data-d=back]{grid-area:3/2}.dpad #hb{grid-area:2/2;font-size:16px}
+.br{right:12px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.br button{background:rgba(13,16,21,.78);color:#eceff4}.br .pri{color:var(--ak);background:var(--ac)}
+#busy,#empty,#err{inset:0;display:none;place-items:center;text-align:center;background:rgba(8,10,14,.82);color:#eceff4;padding:20px}
+#busy.on,#empty.on,#err.on{display:grid}.bx{display:flex;flex-direction:column;gap:12px;align-items:center;max-width:380px}
+.bar{width:180px;height:3px;background:#2a303b;border-radius:2px;overflow:hidden}.bar i{display:block;width:40%;height:100%;background:var(--ac);animation:sl 1s infinite linear}@keyframes sl{from{margin-left:-40%}to{margin-left:100%}}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+.sl{display:grid;grid-template-columns:90px 1fr;align-items:center;font-size:13px;color:var(--mu)}.sl input{width:100%;accent-color:var(--ac)}
+.lk{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:6px;font-size:13px}.lk select{background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:6px;width:100%}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--pn);border:1px solid var(--ac);border-radius:8px;padding:10px 16px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9;max-width:90vw}#toast.on{opacity:1}
+dialog{background:var(--pn);color:var(--tx);border:1px solid var(--ln);border-radius:12px;padding:20px;max-width:420px;width:92vw}dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog label{display:flex;flex-direction:column;gap:4px;margin:12px 0;font-size:14px}dialog select{background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:8px}
+.note{color:var(--mu);font-size:13px}
+@media(max-width:900px){body{overflow:auto}#studio.on{display:flex;flex-direction:column;height:auto;overflow:visible}.screen#studio{overflow:visible}#stage{height:64vh;flex:none;order:-1}aside{border:0;border-top:1px solid var(--ln)}.dpad{grid-template-columns:repeat(3,66px);grid-auto-rows:66px}#map{width:120px;height:120px}}
+</style>
 </head>
 <body>
 
-  <!-- Three.js Canvas -->
-  <canvas id="webgl-canvas"></canvas>
-
-  <!-- 2D Overlay UI Layer -->
-  <div id="ui-layer">
-    
-    <!-- Header -->
-    <header class="interactive">
-      <div class="brand">
-        <div class="brand-logo">A</div>
-        <div class="brand-text">
-          <h1>ARCHI VR</h1>
-          <p>Poorna Market Redevelopment · Visakhapatnam</p>
-        </div>
-      </div>
-
-      <div class="nav-tabs">
-        <button id="btn-mode-model" class="btn active" onclick="switchViewMode('model')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-          3D Model
-        </button>
-        <button id="btn-mode-pano" class="btn" onclick="switchViewMode('pano')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-          360° Enscape
-        </button>
-        <button class="btn" onclick="toggleModal('modal-scenes')">
-          Scenes
-        </button>
-        <button class="btn" onclick="toggleModal('modal-info')">
-          Project Info
-        </button>
-        <button id="btn-enter-vr" class="btn btn-vr">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"></rect><circle cx="8" cy="12" r="2"></circle><circle cx="16" cy="12" r="2"></circle></svg>
-          ENTER VR
-        </button>
-      </div>
-    </header>
-
-    <!-- Block Detail Drawer -->
-    <div id="block-info-drawer" class="interactive">
-      <div>
-        <span class="meta-tag" id="drawer-tag">Commercial Block</span>
-        <h2 id="drawer-title">Meat & Cold Storage</h2>
-      </div>
-      <p id="drawer-desc" style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-        Modernized hygienic retail facility with integrated solar roof-louvers and dedicated cold chain storage.
-      </p>
-      <div class="metric-grid">
-        <div class="metric-item">
-          <p>Gross Area</p>
-          <p id="drawer-area">1,450 sq.m</p>
-        </div>
-        <div class="metric-item">
-          <p>Levels</p>
-          <p id="drawer-levels">G + 1 Floor</p>
-        </div>
-      </div>
-      <button class="btn active" style="justify-content: center; width: 100%; margin-top: 6px;" onclick="enterBlockPanorama()">
-        Explore in 360°
-      </button>
-    </div>
-
-    <!-- Bottom HUD -->
-    <footer>
-      <!-- Interactive 2D Map -->
-      <div class="map-card interactive">
-        <div class="map-header">
-          <span>Site Layout</span>
-          <span id="current-node-label" style="color: var(--accent-cyan);">Main Entrance</span>
-        </div>
-        <canvas id="site-map-canvas" width="240" height="160"></canvas>
-      </div>
-
-      <!-- Directional Controls -->
-      <div class="d-pad-container interactive" id="dpad-wrapper">
-        <div class="d-pad-grid">
-          <div></div>
-          <button id="nav-btn-forward" class="d-btn" onclick="navigate('forward')" title="Forward (W / ↑)">↑</button>
-          <div></div>
-          <button id="nav-btn-left" class="d-btn" onclick="navigate('left')" title="Left (A / ←)">←</button>
-          <div class="d-btn d-btn-center">NAV</div>
-          <button id="nav-btn-right" class="d-btn" onclick="navigate('right')" title="Right (D / →)">→</button>
-          <div></div>
-          <button id="nav-btn-back" class="d-btn" onclick="navigate('back')" title="Back (S / ↓)">↓</button>
-          <div></div>
-        </div>
-      </div>
-    </footer>
+<section id="start" class="screen on">
+  <div class="hero">
+    <svg class="drift" viewBox="0 0 600 300" role="img" aria-label="VR headset in front of a panoramic architectural sketch">
+      <g fill="none" stroke="var(--ac)" stroke-width="1.2" opacity=".55">
+        <ellipse cx="300" cy="150" rx="285" ry="110"/><ellipse cx="300" cy="150" rx="190" ry="110"/><ellipse cx="300" cy="150" rx="95" ry="110"/>
+        <path d="M15 150H585M60 90Q300 40 540 90M60 210Q300 260 540 210"/>
+        <path d="M70 150v-34h30v34M110 150v-58h24v58M470 150v-46h36v46M516 150v-24h22v24" stroke-width="1.6"/>
+      </g>
+      <g>
+        <rect x="205" y="112" width="190" height="86" rx="30" fill="var(--pn)" stroke="var(--ac)" stroke-width="2.5"/>
+        <rect x="222" y="128" width="72" height="54" rx="22" fill="var(--bg)" stroke="var(--ln)"/>
+        <rect x="306" y="128" width="72" height="54" rx="22" fill="var(--bg)" stroke="var(--ln)"/>
+        <path d="M205 140q-34 10-34 14t34 14M395 140q34 10 34 14t-34 14" fill="none" stroke="var(--ln)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M250 158l-14 14h28zM342 158l-14 14h28z" fill="var(--ac)" opacity=".7"/>
+      </g>
+    </svg>
+    <h1>ARCHI VR</h1>
+    <p>Walk through your architecture in 360°, on screen or in a Meta Quest headset.</p>
   </div>
+  <button class="pri" id="enter">Enter app</button>
+</section>
 
-  <!-- Toast Notification -->
-  <div id="toast">Notice</div>
+<section id="guide" class="screen">
+ <div class="gw">
+  <div class="gh"><b>ARCHI VR</b><div class="dots"><i class="on"></i><i></i><i></i></div><button id="skip">Skip guide</button></div>
 
-  <!-- Scenes Modal -->
-  <div id="modal-scenes" class="modal-overlay" onclick="if(event.target === this) toggleModal('modal-scenes')">
-    <div class="modal-card">
-      <h3>Select 360° Scene Node</h3>
-      <p style="font-size: 13px; color: var(--text-muted);">Directly jump to any architectural viewpoint across the site.</p>
-      <div class="scene-grid-list" id="scenes-modal-list"></div>
-      <button class="btn" style="margin-top: 20px; width: 100%; justify-content: center;" onclick="toggleModal('modal-scenes')">Close</button>
+  <div class="gstep on">
+    <h2>How to explore</h2>
+    <p>Looking around and moving are separate. Drag or turn your head to look. Use the four arrows to travel to a connected viewpoint.</p>
+    <div class="demo" aria-label="Animated direction pad demo"><i>↑</i><i>←</i><i>→</i><i>↓</i></div>
+    <div class="cards">
+      <div class="card"><b>Look</b><span>Drag with mouse or finger. In VR, turn your head.</span></div>
+      <div class="card"><b>Move</b><span>W A S D, arrow keys, the on-screen arrows, or flick a Quest thumbstick.</span></div>
+      <div class="card"><b>Select</b><span>Click, tap, or pull the Quest trigger while pointing at a button.</span></div>
+      <div class="card"><b>Return</b><span>The centre button steps back through where you have been.</span></div>
     </div>
   </div>
 
-  <!-- Project Info Modal -->
-  <div id="modal-info" class="modal-overlay" onclick="if(event.target === this) toggleModal('modal-info')">
-    <div class="modal-card">
-      <h3>Poorna Market Redevelopment</h3>
-      <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
-        A civic thesis design exploring contextual market infrastructure, decentralized natural ventilation, and pedestrian segregation in Visakhapatnam, India.
-      </p>
-      <div class="metric-grid">
-        <div class="metric-item"><p>Typology</p><p>Urban Market</p></div>
-        <div class="metric-item"><p>Total Site Area</p><p>4.2 Acres</p></div>
-        <div class="metric-item"><p>FAR</p><p>1.75</p></div>
-        <div class="metric-item"><p>Software</p><p>SketchUp + Enscape</p></div>
-      </div>
-      <button class="btn" style="margin-top: 20px; width: 100%; justify-content: center;" onclick="toggleModal('modal-info')">Close</button>
+  <div class="gstep">
+    <h2>Connect your Meta Quest</h2>
+    <p>The app runs in the headset's browser. There is nothing to pair; you only open this page on the Quest.</p>
+    <ol class="st">
+      <li>Put on your Quest and open <b>Meta Quest Browser</b>.</li>
+      <li>Open this page's address (copy it, then send it to the headset with the Meta Horizon phone app, or type it in).<div class="url"><span id="u"></span><button id="cp">Copy link</button></div></li>
+      <li>Select <b>Check headset</b> below. It should report that VR is supported.</li>
+      <li>On a PC, you can also use Quest Link and open the page in Chrome or Edge.</li>
+    </ol>
+    <div class="row" style="flex:none"><button id="chk" class="pri" style="flex:none">Check headset</button></div>
+    <div id="chkout" role="status"></div>
+    <p class="note">VR needs a secure (https) address. Hosted pages already have one.</p>
+  </div>
+
+  <div class="gstep">
+    <h2>Upload your 360° images</h2>
+    <p>Add Enscape panoramas (2:1 JPG, PNG or WebP). Place them on the map, link them with arrows, adjust the look, then view them in VR.</p>
+    <div class="cards">
+      <div class="card"><b>Upload</b><span>Drop one or many images. They stay on this device.</span></div>
+      <div class="card"><b>Map and arrows</b><span>Drag pins on the map corner, then choose which scene each arrow leads to.</span></div>
+      <div class="card"><b>Style</b><span>Brightness, contrast, colour, warmth and direction per image.</span></div>
+      <div class="card"><b>Resolution</b><span>Settings lets you cap image size so big renders run smoothly on Quest.</span></div>
     </div>
   </div>
 
-  <!-- Application Logic -->
-  <script>
-    /* ============================================================
-       01. ARCHITECTURAL GRAPH & PROJECT DATA
-       ============================================================ */
-    const projectData = {
-      id: "poorna-market",
-      name: "Poorna Market Redevelopment",
-      location: "Visakhapatnam, India",
-      blocks: [
-        {
-          id: "block-puja",
-          name: "Puja Market Arcade",
-          color: 0xf59e0b,
-          position: [-16, 2.5, -8],
-          size: [12, 5, 10],
-          area: "820 sq.m",
-          levels: "Ground Floor",
-          desc: "Dedicated traditional floral and sacred goods stalls with passive convective ventilation chimneys.",
-          defaultScene: "puja-market"
-        },
-        {
-          id: "block-veg",
-          name: "Vegetable Wholesale Hall",
-          color: 0x10b981,
-          position: [16, 3.5, -8],
-          size: [14, 7, 12],
-          area: "2,100 sq.m",
-          levels: "G + Mezzanine",
-          desc: "High-volume open-truss hall accommodating wholesale farming logistics and retail produce stalls.",
-          defaultScene: "veg-market"
-        },
-        {
-          id: "block-meat",
-          name: "Meat & Cold Storage",
-          color: 0xef4444,
-          position: [16, 3, -26],
-          size: [12, 6, 12],
-          area: "1,450 sq.m",
-          levels: "G + 1 Floor",
-          desc: "Hygienic refrigerated retail zone with waterproof wall seals and isolated service loading docks.",
-          defaultScene: "meat-market"
-        },
-        {
-          id: "block-hawker",
-          name: "Hawker Spine Street",
-          color: 0x8b5cf6,
-          position: [0, 2, -18],
-          size: [10, 4, 18],
-          area: "1,200 sq.m",
-          levels: "Open Plaza",
-          desc: "Shaded linear pedestrian plaza designed for micro-vendors, street food stalls, and public gathering.",
-          defaultScene: "hawker-street"
-        }
-      ],
-      scenes: {
-        "entrance": {
-          id: "entrance",
-          name: "Main Civic Entrance",
-          blockId: null,
-          coords: [120, 140],
-          color: "#3b82f6",
-          navigation: { forward: "central-street", back: null, left: null, right: null }
-        },
-        "central-street": {
-          id: "central-street",
-          name: "Central Promenade",
-          blockId: "block-hawker",
-          coords: [120, 100],
-          color: "#8b5cf6",
-          navigation: { forward: "hawker-street", back: "entrance", left: "puja-market", right: "veg-market" }
-        },
-        "puja-market": {
-          id: "puja-market",
-          name: "Puja Market Arcade",
-          blockId: "block-puja",
-          coords: [60, 80],
-          color: "#f59e0b",
-          navigation: { forward: "puja-interior", back: "central-street", left: null, right: null }
-        },
-        "puja-interior": {
-          id: "puja-interior",
-          name: "Puja Arcade Inner Atrium",
-          blockId: "block-puja",
-          coords: [50, 40],
-          color: "#d97706",
-          navigation: { forward: null, back: "puja-market", left: null, right: null }
-        },
-        "veg-market": {
-          id: "veg-market",
-          name: "Vegetable Hall Entry",
-          blockId: "block-veg",
-          coords: [180, 80],
-          color: "#10b981",
-          navigation: { forward: "veg-interior", back: "central-street", left: null, right: null }
-        },
-        "veg-interior": {
-          id: "veg-interior",
-          name: "Vegetable Hall Interior",
-          blockId: "block-veg",
-          coords: [190, 40],
-          color: "#059669",
-          navigation: { forward: null, back: "veg-market", left: null, right: null }
-        },
-        "hawker-street": {
-          id: "hawker-street",
-          name: "Hawker Spine Walkway",
-          blockId: "block-hawker",
-          coords: [120, 60],
-          color: "#7c3aed",
-          navigation: { forward: "meat-market", back: "central-street", left: null, right: null }
-        },
-        "meat-market": {
-          id: "meat-market",
-          name: "Meat Market North Entry",
-          blockId: "block-meat",
-          coords: [180, 20],
-          color: "#ef4444",
-          navigation: { forward: null, back: "hawker-street", left: null, right: null }
-        }
-      }
-    };
-
-    /* ============================================================
-       02. APPLICATION STATE
-       ============================================================ */
-    const state = {
-      viewMode: "model", // "model" | "pano"
-      currentSceneId: "entrance",
-      selectedBlock: null,
-      inVR: false,
-      navHistory: [],
-      sound: true
-    };
-
-    /* ============================================================
-       03. GRAPHICS SETUP (Three.js & WebXR)
-       ============================================================ */
-    const canvas = document.getElementById("webgl-canvas");
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.xr.enabled = true;
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0d14);
-
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 30, 45);
-
-    // Group containers for easy switching
-    const modelGroup = new THREE.Group();
-    const panoGroup = new THREE.Group();
-    scene.add(modelGroup);
-    scene.add(panoGroup);
-    panoGroup.visible = false;
-
-    // Lighting for 3D Architectural Model
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
-    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight1.position.set(30, 50, 40);
-    scene.add(dirLight1);
-
-    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.3);
-    dirLight2.position.set(-30, 20, -30);
-    scene.add(dirLight2);
-
-    /* ============================================================
-       04. PROCEDURAL ASSET GENERATORS
-       (Simulating SketchUp Massing & Enscape 360° Lightprobes)
-       ============================================================ */
-    const blockMeshes = [];
-
-    function buildArchitecturalModel() {
-      // Ground plane / Site boundary
-      const groundGeo = new THREE.PlaneGeometry(90, 110);
-      const groundMat = new THREE.MeshStandardMaterial({
-        color: 0x111827,
-        roughness: 0.9,
-        metalness: 0.1
-      });
-      const ground = new THREE.Mesh(groundGeo, groundMat);
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.set(0, -0.05, -15);
-      modelGroup.add(ground);
-
-      // Grid helper (CAD/Architectural datum reference)
-      const grid = new THREE.GridHelper(90, 45, 0x38bdf8, 0x1e293b);
-      grid.position.set(0, 0, -15);
-      modelGroup.add(grid);
-
-      // Build architectural programmatic massings
-      projectData.blocks.forEach(block => {
-        const geo = new THREE.BoxGeometry(...block.size);
-        const mat = new THREE.MeshStandardMaterial({
-          color: block.color,
-          roughness: 0.4,
-          metalness: 0.2,
-          transparent: true,
-          opacity: 0.85
-        });
-
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(...block.position);
-        mesh.userData = { blockId: block.id, originalColor: block.color };
-
-        // Architectural wireframe edge overlay
-        const edges = new THREE.EdgesGeometry(geo);
-        const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 1 });
-        const wireframe = new THREE.LineSegments(edges, lineMat);
-        mesh.add(wireframe);
-
-        modelGroup.add(mesh);
-        blockMeshes.push(mesh);
-      });
-    }
-
-    // Equirectangular 360° Sphere for Enscape Panoramas
-    const panoSphereGeo = new THREE.SphereGeometry(300, 60, 40);
-    panoSphereGeo.scale(-1, 1, 1); // Invert faces inward
-    const panoSphereMat = new THREE.MeshBasicMaterial();
-    const panoSphere = new THREE.Mesh(panoSphereGeo, panoSphereMat);
-    panoGroup.add(panoSphere);
-
-    // Dynamic Architectural 360° Canvas Texture Generator
-    function generateEnscapePanoTexture(sceneObj) {
-      const pCanvas = document.createElement("canvas");
-      pCanvas.width = 2048;
-      pCanvas.height = 1024;
-      const ctx = pCanvas.getContext("2d");
-
-      // Architectural Sky / Horizon gradient
-      const grad = ctx.createLinearGradient(0, 0, 0, 1024);
-      grad.addColorStop(0, "#0369a1");
-      grad.addColorStop(0.48, "#bae6fd");
-      grad.addColorStop(0.5, "#94a3b8");
-      grad.addColorStop(1, "#1e293b");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 2048, 1024);
-
-      // Architectural Grid & Context Columns
-      ctx.fillStyle = sceneObj.color;
-      ctx.globalAlpha = 0.35;
-      for (let i = 0; i < 8; i++) {
-        const x = i * 256 + 40;
-        ctx.fillRect(x, 480, 160, 544);
-      }
-      ctx.globalAlpha = 1.0;
-
-      // Architectural Spatial Horizon Lines
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, 512);
-      ctx.lineTo(2048, 512);
-      ctx.stroke();
-
-      // Viewpoint Typography Callout directly baked in panorama
-      ctx.font = "bold 44px 'Space Grotesk', sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.fillText(sceneObj.name.toUpperCase(), 1024, 460);
-      ctx.font = "24px 'Inter', sans-serif";
-      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-      ctx.fillText("ARCHITECTURAL ENSCAPE PERSPECTIVE VIEW · 1:1 SCALE", 1024, 400);
-
-      const texture = new THREE.CanvasTexture(pCanvas);
-      return texture;
-    }
-
-    function loadScenePanorama(sceneId) {
-      const sceneObj = projectData.scenes[sceneId];
-      if (!sceneObj) return;
-
-      const newTexture = generateEnscapePanoTexture(sceneObj);
-      if (panoSphereMat.map) panoSphereMat.map.dispose();
-      panoSphereMat.map = newTexture;
-      panoSphereMat.needsUpdate = true;
-
-      // Update Navigation State & HUD
-      state.currentSceneId = sceneId;
-      document.getElementById("current-node-label").innerText = sceneObj.name;
-      updateNavigationControls();
-      drawSiteMap();
-    }
-
-    /* ============================================================
-       05. ORBIT & INTERACTION CONTROLS (Desktop/Mobile)
-       ============================================================ */
-    let isDragging = false;
-    let prevMousePos = { x: 0, y: 0 };
-    let cameraAngle = { theta: 0, phi: Math.PI / 4, radius: 65 };
-    let panoLook = { lon: 0, lat: 0 };
-
-    window.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".interactive")) return;
-      isDragging = true;
-      prevMousePos = { x: e.clientX, y: e.clientY };
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      const deltaX = e.clientX - prevMousePos.x;
-      const deltaY = e.clientY - prevMousePos.y;
-      prevMousePos = { x: e.clientX, y: e.clientY };
-
-      if (!isDragging) {
-        // Hover Raycasting for 3D Blocks in Model Mode
-        if (state.viewMode === "model" && !state.inVR) {
-          raycastBlocks(e.clientX, e.clientY);
-        }
-        return;
-      }
-
-      if (state.viewMode === "model") {
-        cameraAngle.theta -= deltaX * 0.006;
-        cameraAngle.phi = Math.max(0.1, Math.min(Math.PI / 2.1, cameraAngle.phi - deltaY * 0.006));
-        updateModelCamera();
-      } else {
-        panoLook.lon += deltaX * 0.15;
-        panoLook.lat = Math.max(-85, Math.min(85, panoLook.lat - deltaY * 0.15));
-        updatePanoCamera();
-      }
-    });
-
-    window.addEventListener("mouseup", () => { isDragging = false; });
-
-    window.addEventListener("wheel", (e) => {
-      if (state.viewMode === "model") {
-        cameraAngle.radius = Math.max(20, Math.min(130, cameraAngle.radius + e.deltaY * 0.05));
-        updateModelCamera();
-      }
-    });
-
-    function updateModelCamera() {
-      camera.position.x = cameraAngle.radius * Math.sin(cameraAngle.phi) * Math.sin(cameraAngle.theta);
-      camera.position.y = cameraAngle.radius * Math.cos(cameraAngle.phi);
-      camera.position.z = cameraAngle.radius * Math.sin(cameraAngle.phi) * Math.cos(cameraAngle.theta) - 15;
-      camera.lookAt(0, 0, -15);
-    }
-
-    function updatePanoCamera() {
-      const phi = THREE.MathUtils.degToRad(90 - panoLook.lat);
-      const theta = THREE.MathUtils.degToRad(panoLook.lon);
-      const target = new THREE.Vector3();
-      target.x = 500 * Math.sin(phi) * Math.cos(theta);
-      target.y = 500 * Math.cos(phi);
-      target.z = 500 * Math.sin(phi) * Math.sin(theta);
-      camera.lookAt(target);
-    }
-
-    // Raycast block selection
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    function raycastBlocks(clientX, clientY) {
-      mouse.x = (clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-
-      const intersects = raycaster.intersectObjects(blockMeshes);
-      blockMeshes.forEach(mesh => {
-        mesh.material.opacity = (state.selectedBlock === mesh.userData.blockId) ? 1.0 : 0.75;
-      });
-
-      if (intersects.length > 0) {
-        const hit = intersects[0].object;
-        hit.material.opacity = 1.0;
-        document.body.style.cursor = "pointer";
-      } else {
-        document.body.style.cursor = "default";
-      }
-    }
-
-    window.addEventListener("click", (e) => {
-      if (e.target.closest(".interactive") || state.viewMode !== "model") return;
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-
-      const intersects = raycaster.intersectObjects(blockMeshes);
-      if (intersects.length > 0) {
-        const blockId = intersects[0].object.userData.blockId;
-        selectBlock(blockId);
-      } else {
-        deselectBlock();
-      }
-    });
-
-    /* ============================================================
-       06. BLOCK SELECTION & FLYOUT
-       ============================================================ */
-    function selectBlock(blockId) {
-      state.selectedBlock = blockId;
-      const block = projectData.blocks.find(b => b.id === blockId);
-      if (!block) return;
-
-      document.getElementById("drawer-title").innerText = block.name;
-      document.getElementById("drawer-desc").innerText = block.desc;
-      document.getElementById("drawer-area").innerText = block.area;
-      document.getElementById("drawer-levels").innerText = block.levels;
-      document.getElementById("block-info-drawer").style.display = "flex";
-
-      showToast(`Selected: ${block.name}`);
-    }
-
-    function deselectBlock() {
-      state.selectedBlock = null;
-      document.getElementById("block-info-drawer").style.display = "none";
-    }
-
-    function enterBlockPanorama() {
-      if (!state.selectedBlock) return;
-      const block = projectData.blocks.find(b => b.id === state.selectedBlock);
-      if (block && block.defaultScene) {
-        state.navHistory.push(state.currentSceneId);
-        switchViewMode("pano");
-        loadScenePanorama(block.defaultScene);
-        showToast(`Entering ${block.name}`);
-      }
-    }
-
-    /* ============================================================
-       07. DIRECTIONAL NAVIGATION & GRAPH LOGIC
-       ============================================================ */
-    function updateNavigationControls() {
-      const current = projectData.scenes[state.currentSceneId];
-      if (!current) return;
-
-      const directions = ["forward", "back", "left", "right"];
-      directions.forEach(dir => {
-        const btn = document.getElementById(`nav-btn-${dir}`);
-        const targetSceneId = current.navigation[dir];
-        if (targetSceneId && projectData.scenes[targetSceneId]) {
-          btn.disabled = false;
-        } else {
-          btn.disabled = true;
-        }
-      });
-    }
-
-    function navigate(direction) {
-      const current = projectData.scenes[state.currentSceneId];
-      if (!current) return;
-
-      const nextSceneId = current.navigation[direction];
-      if (nextSceneId && projectData.scenes[nextSceneId]) {
-        state.navHistory.push(state.currentSceneId);
-        loadScenePanorama(nextSceneId);
-        showToast(`Navigated to ${projectData.scenes[nextSceneId].name}`);
-      }
-    }
-
-    // Keyboard bindings for navigation
-    window.addEventListener("keydown", (e) => {
-      if (state.viewMode !== "pano") return;
-      if (e.key === "w" || e.key === "ArrowUp") navigate("forward");
-      if (e.key === "s" || e.key === "ArrowDown") navigate("back");
-      if (e.key === "a" || e.key === "ArrowLeft") navigate("left");
-      if (e.key === "d" || e.key === "ArrowRight") navigate("right");
-    });
-
-    /* ============================================================
-       08. 2D INTERACTIVE ARCHITECTURAL SITE MAP
-       ============================================================ */
-    const mapCanvas = document.getElementById("site-map-canvas");
-    const mapCtx = mapCanvas.getContext("2d");
-
-    function drawSiteMap() {
-      mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-
-      // Draw Site Roads / Boundaries
-      mapCtx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-      mapCtx.lineWidth = 1;
-      mapCtx.strokeRect(20, 10, 200, 140);
-
-      // Draw Blocks
-      mapCtx.fillStyle = "rgba(245, 158, 11, 0.35)";
-      mapCtx.fillRect(40, 50, 40, 50); // Puja
-
-      mapCtx.fillStyle = "rgba(16, 185, 129, 0.35)";
-      mapCtx.fillRect(160, 50, 45, 60); // Veg
-
-      mapCtx.fillStyle = "rgba(239, 68, 68, 0.35)";
-      mapCtx.fillRect(160, 15, 45, 30); // Meat
-
-      mapCtx.fillStyle = "rgba(139, 92, 246, 0.35)";
-      mapCtx.fillRect(100, 40, 40, 70); // Hawker
-
-      // Draw Scene Nodes & Connections
-      const scenes = projectData.scenes;
-      for (const key in scenes) {
-        const scn = scenes[key];
-        const [x, y] = scn.coords;
-
-        // Draw connections
-        if (scn.navigation.forward && scenes[scn.navigation.forward]) {
-          const target = scenes[scn.navigation.forward];
-          mapCtx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-          mapCtx.setLineDash([2, 2]);
-          mapCtx.beginPath();
-          mapCtx.moveTo(x, y);
-          mapCtx.lineTo(...target.coords);
-          mapCtx.stroke();
-          mapCtx.setLineDash([]);
-        }
-
-        // Draw node dot
-        mapCtx.beginPath();
-        mapCtx.arc(x, y, 4, 0, Math.PI * 2);
-        mapCtx.fillStyle = (key === state.currentSceneId) ? "#0ea5e9" : "#64748b";
-        mapCtx.fill();
-
-        // Pulsing active node indicator
-        if (key === state.currentSceneId) {
-          mapCtx.beginPath();
-          mapCtx.arc(x, y, 8, 0, Math.PI * 2);
-          mapCtx.strokeStyle = "#38bdf8";
-          mapCtx.lineWidth = 2;
-          mapCtx.stroke();
-        }
-      }
-    }
-
-    // Map Click Navigation
-    mapCanvas.addEventListener("click", (e) => {
-      const rect = mapCanvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      for (const key in projectData.scenes) {
-        const scn = projectData.scenes[key];
-        const [x, y] = scn.coords;
-        const dist = Math.hypot(clickX - x, clickY - y);
-        if (dist < 12) {
-          switchViewMode("pano");
-          loadScenePanorama(key);
-          showToast(`Jumped to ${scn.name}`);
-          break;
-        }
-      }
-    });
-
-    /* ============================================================
-       09. MODE SWITCHING & MODALS
-       ============================================================ */
-    function switchViewMode(mode) {
-      state.viewMode = mode;
-      document.getElementById("btn-mode-model").classList.toggle("active", mode === "model");
-      document.getElementById("btn-mode-pano").classList.toggle("active", mode === "pano");
-
-      if (mode === "model") {
-        modelGroup.visible = true;
-        panoGroup.visible = false;
-        camera.position.set(0, 30, 45);
-        camera.lookAt(0, 0, -15);
-        document.getElementById("dpad-wrapper").style.display = "none";
-      } else {
-        modelGroup.visible = false;
-        panoGroup.visible = true;
-        camera.position.set(0, 0, 0);
-        updatePanoCamera();
-        document.getElementById("dpad-wrapper").style.display = "flex";
-        loadScenePanorama(state.currentSceneId);
-      }
-    }
-
-    function toggleModal(modalId) {
-      const modal = document.getElementById(modalId);
-      const isVisible = modal.style.display === "flex";
-      modal.style.display = isVisible ? "none" : "flex";
-
-      if (!isVisible && modalId === "modal-scenes") {
-        const container = document.getElementById("scenes-modal-list");
-        container.innerHTML = "";
-        for (const key in projectData.scenes) {
-          const scn = projectData.scenes[key];
-          const div = document.createElement("div");
-          div.className = "scene-card-item";
-          div.innerHTML = `<strong>${scn.name}</strong><br><small style="color:#94a3b8;">Node: ${key}</small>`;
-          div.onclick = () => {
-            toggleModal("modal-scenes");
-            switchViewMode("pano");
-            loadScenePanorama(key);
-          };
-          container.appendChild(div);
-        }
-      }
-    }
-
-    function showToast(msg) {
-      const toast = document.getElementById("toast");
-      toast.innerText = msg;
-      toast.style.display = "block";
-      setTimeout(() => { toast.style.display = "none"; }, 2500);
-    }
-
-    /* ============================================================
-       10. WEBXR & META QUEST CONTROLLER INTEGRATION
-       ============================================================ */
-    const vrBtn = document.getElementById("btn-enter-vr");
-
-    if ('xr' in navigator) {
-      navigator.xr.isSessionSupported('immersive-vr').then(supported => {
-        if (!supported) {
-          vrBtn.disabled = true;
-          vrBtn.title = "Immersive VR not supported on this browser/hardware";
-        }
-      });
-    }
-
-    vrBtn.addEventListener("click", () => {
-      if (!state.inVR) {
-        navigator.xr.requestSession('immersive-vr', {
-          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
-        }).then(onVRSessionStarted);
-      }
-    });
-
-    // In-VR Floating HUD Canvas Mesh
-    let vrHUDMesh = null;
-    function createInVRHUD() {
-      const hudCanvas = document.createElement("canvas");
-      hudCanvas.width = 512;
-      hudCanvas.height = 256;
-      const ctx = hudCanvas.getContext("2d");
-
-      ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
-      ctx.fillRect(0, 0, 512, 256);
-      ctx.strokeStyle = "#38bdf8";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(6, 6, 500, 244);
-
-      ctx.font = "bold 32px 'Space Grotesk', sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText("POORNA MARKET VR", 30, 60);
-
-      ctx.font = "20px 'Inter', sans-serif";
-      ctx.fillStyle = "#94a3b8";
-      ctx.fillText("L-Thumbstick: Move | R-Thumbstick: Snap Turn", 30, 110);
-      ctx.fillText("Trigger: Select Node | Menu: Toggle HUD", 30, 150);
-
-      const texture = new THREE.CanvasTexture(hudCanvas);
-      const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-      const geo = new THREE.PlaneGeometry(1.6, 0.8);
-      vrHUDMesh = new THREE.Mesh(geo, mat);
-      vrHUDMesh.position.set(0, 1.4, -2);
-      scene.add(vrHUDMesh);
-    }
-
-    function onVRSessionStarted(session) {
-      state.inVR = true;
-      switchViewMode("pano");
-      renderer.xr.setSession(session);
-      createInVRHUD();
-
-      session.addEventListener("end", () => {
-        state.inVR = false;
-        if (vrHUDMesh) scene.remove(vrHUDMesh);
-      });
-
-      setupVRControllers();
-    }
-
-    // VR Controller Polish & Thumbstick Polling
-    let controller1, controller2;
-    function setupVRControllers() {
-      controller1 = renderer.xr.getController(0);
-      controller2 = renderer.xr.getController(1);
-
-      // Visual ray lines
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -3)]);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
-      controller1.add(new THREE.Line(lineGeo, lineMat));
-      controller2.add(new THREE.Line(lineGeo, lineMat));
-
-      scene.add(controller1);
-      scene.add(controller2);
-    }
-
-    function handleVRInput() {
-      const session = renderer.xr.getSession();
-      if (!session) return;
-
-      for (const source of session.inputSources) {
-        if (!source.gamepad) continue;
-        const axes = source.gamepad.axes;
-
-        // Left thumbstick directional trigger (Axes 2, 3 on WebXR standard gamepad)
-        if (source.handedness === 'left') {
-          const x = axes[2];
-          const y = axes[3];
-
-          if (y < -0.6) navigate("forward");
-          else if (y > 0.6) navigate("back");
-          else if (x < -0.6) navigate("left");
-          else if (x > 0.6) navigate("right");
-        }
-      }
-    }
-
-    /* ============================================================
-       11. RENDER & ANIMATION LOOP
-       ============================================================ */
-    function animate() {
-      renderer.setAnimationLoop(() => {
-        if (state.inVR) {
-          handleVRInput();
-        }
-
-        renderer.render(scene, camera);
-      });
-    }
-
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // Initialize Prototype
-    buildArchitecturalModel();
-    updateModelCamera();
-    updateNavigationControls();
-    drawSiteMap();
-    animate();
-  </script>
+  <div class="gf"><button id="gb">Back</button><button id="gn" class="pri">Next</button></div>
+ </div>
+</section>
+
+<section id="studio" class="screen">
+ <aside>
+  <b style="font-size:18px">Upload studio</b>
+  <label class="row" style="display:flex"><input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button class="pri" onclick="$('#file').click()">Upload images</button></label>
+  <div class="row"><button id="demo">Load demo scenes</button><button id="auto">Auto-link</button></div>
+  <h3>Scenes (double-click to rename)</h3>
+  <div id="list"></div>
+  <div class="row"><button id="guideBtn">Guide</button><button id="setBtn">Settings</button></div>
+ </aside>
+
+ <main id="stage">
+  <canvas id="gl"></canvas>
+  <div class="ov top"><div><small id="pj">My uploads</small><b id="loc">No scene</b></div><button id="fs" title="Fullscreen">⛶</button></div>
+  <canvas id="map" class="ov" width="336" height="336" aria-label="Site map. Select a pin to jump to that scene."></canvas>
+  <div class="ov dpad">
+    <button data-d="forward" aria-label="Forward">↑</button><button data-d="left" aria-label="Left">←</button><button id="hb" title="Go back to previous location" aria-label="Previous location">↩</button><button data-d="right" aria-label="Right">→</button><button data-d="back" aria-label="Back">↓</button>
+  </div>
+  <div class="ov br"><button id="vr" class="pri">View in VR</button></div>
+  <div id="empty" class="ov"><div class="bx"><h2>Add your first 360° scene</h2><p class="note">Drop an equirectangular image here, or try the demo scenes.</p><div class="row"><button class="pri" onclick="$('#file').click()">Upload images</button><button onclick="$('#demo').click()">Load demo</button></div></div></div>
+  <div id="busy" class="ov"><div class="bx"><b id="bt">Loading…</b><div class="bar"><i></i></div></div></div>
+  <div id="err" class="ov"><div class="bx"><b id="em">Something went wrong</b><div class="row"><button id="retry" class="pri">Retry</button><button id="eb">Back</button></div></div></div>
+ </main>
+
+ <aside class="r">
+  <h3>Image style</h3>
+  <div class="row" id="pre"></div>
+  <div id="sls"></div>
+  <button id="all">Copy style to all scenes</button>
+  <h3>Arrow links for this scene</h3>
+  <div id="lks"></div>
+  <p class="note">An empty link disables that arrow.</p>
+ </aside>
+</section>
+
+<dialog id="set">
+  <h2>Settings</h2>
+  <label>Image resolution
+    <select id="res"><option value="2048">2048 × 1024 (lightest)</option><option value="4096">4096 × 2048 (recommended)</option><option value="6144">6144 × 3072</option><option value="8192">8192 × 4096 (sharpest)</option></select>
+  </label>
+  <p class="note" id="resn"></p>
+  <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="snd"> Sound on (ambient audio is planned)</label>
+  <div class="row"><button id="rst">Reset experience</button><button class="pri" id="sx">Done</button></div>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const DIRS=['forward','back','left','right'],ARW={forward:'↑',back:'↓',left:'←',right:'→'};
+const S={sc:[],cur:null,hist:[],res:4096,snd:true,n:0};
+try{S.res=+localStorage.getItem('archi-res')||4096;S.snd=localStorage.getItem('archi-snd')!=='0'}catch(e){}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),3400)}
+function show(id){$$('.screen').forEach(e=>e.classList.toggle('on',e.id===id));if(id==='studio')setTimeout(resize,40)}
+const cur=()=>S.sc.find(s=>s.id===S.cur),byId=id=>S.sc.find(s=>s.id===id);
+
+/* ---------- start + guide ---------- */
+let gs=0;
+function gshow(n){gs=n;$$('.gstep').forEach((e,i)=>e.classList.toggle('on',i===n));$$('.dots i').forEach((e,i)=>e.classList.toggle('on',i===n));$('#gb').style.visibility=n?'visible':'hidden';$('#gn').textContent=n===2?'Open upload studio':'Next'}
+$('#enter').onclick=()=>{show('guide');gshow(0)};
+$('#skip').onclick=()=>show('studio');
+$('#gb').onclick=()=>gshow(Math.max(0,gs-1));
+$('#gn').onclick=()=>gs===2?show('studio'):gshow(gs+1);
+$('#guideBtn').onclick=()=>{show('guide');gshow(0)};
+$('#u').textContent=location.href.split('#')[0];
+$('#cp').onclick=()=>{navigator.clipboard?.writeText(location.href).then(()=>toast('Link copied'),()=>toast('Copy failed. Select the link and copy it manually.'))};
+$('#chk').onclick=async()=>{const o=$('#chkout');if(!navigator.xr){o.textContent='✕ WebXR is not available here. Open this page in Meta Quest Browser.';return}
+  try{o.textContent=(await navigator.xr.isSessionSupported('immersive-vr'))?'✓ Headset ready. VR is supported in this browser.':'✕ This browser or device cannot start a VR session.'}catch(e){o.textContent='✕ '+e.message}};
+
+/* ---------- three.js ---------- */
+const R=new THREE.WebGLRenderer({canvas:$('#gl'),antialias:true});
+R.xr.enabled=true;R.xr.setReferenceSpaceType('local');R.setPixelRatio(Math.min(devicePixelRatio,2));
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(75,1,.1,200);cam.rotation.order='YXZ';
+const mat=new THREE.ShaderMaterial({uniforms:{t:{value:null},b:{value:0},c:{value:1},s:{value:1},w:{value:0},f:{value:1}},
+ vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+ fragmentShader:'uniform sampler2D t;uniform float b,c,s,w,f;varying vec2 v;void main(){vec3 k=texture2D(t,v).rgb+b;k=(k-.5)*c+.5;float l=dot(k,vec3(.299,.587,.114));k=mix(vec3(l),k,s);k.r+=w*.1;k.b-=w*.1;gl_FragColor=vec4(k*f,1.);}'});
+const gSph=new THREE.SphereGeometry(50,64,40);gSph.scale(-1,1,1);
+const sphere=new THREE.Mesh(gSph,mat);sc.add(sphere);
+function resize(){const b=$('#stage');if(R.xr.isPresenting||!b.clientWidth)return;R.setSize(b.clientWidth,b.clientHeight,false);cam.aspect=b.clientWidth/b.clientHeight;cam.updateProjectionMatrix()}
+new ResizeObserver(resize).observe($('#stage'));addEventListener('resize',resize);
+
+let yaw=0,pitch=0,drag=null;const gl=$('#gl');
+gl.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};gl.setPointerCapture(e.pointerId)};
+gl.onpointermove=e=>{if(!drag)return;const k=cam.fov/gl.clientHeight*Math.PI/180;yaw+=(e.clientX-drag.x)*k;pitch=Math.max(-1.4,Math.min(1.4,pitch+(e.clientY-drag.y)*k));drag={x:e.clientX,y:e.clientY}};
+gl.onpointerup=()=>drag=null;
+gl.onwheel=e=>{e.preventDefault();cam.fov=Math.max(40,Math.min(100,cam.fov+e.deltaY*.04));cam.updateProjectionMatrix()};
+
+/* fade is time-based inside the render loop so it also works in VR */
+let fadeT=1;const fade=to=>{fadeT=to;return new Promise(r=>setTimeout(r,240))};
+
+/* ---------- textures / resolution ---------- */
+const loadImg=u=>new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('This image could not be read. Use a JPG, PNG or WebP file.'));i.src=u});
+async function tex(s){
+  const W=Math.min(S.res,R.capabilities.maxTextureSize);if(s.tex&&s.tw===W)return s.tex;
+  const i=await loadImg(s.url);s.ow=i.naturalWidth;s.oh=i.naturalHeight;
+  const w=Math.min(W,i.naturalWidth),h=w>>1,cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(i,0,0,w,h);
+  if(s.tex)s.tex.dispose();const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;t.anisotropy=4;
+  s.tex=t;s.tw=W;s.rw=w;return t}
+
+/* ---------- navigation manager (single entry for every input) ---------- */
+async function go(id,push=true){
+  const s=byId(id);if(!s)return;if(push&&S.cur&&S.cur!==id)S.hist.push(S.cur);
+  await fade(0);busy('Preparing '+s.name+'…');
+  try{const t=await tex(s);mat.uniforms.t.value=t;S.cur=id;applyStyle();busy(0);upd();fadeT=1;
+    const keep=new Set([id,...DIRS.map(d=>s.nav[d])]);
+    S.sc.forEach(x=>{if(!keep.has(x.id)&&x.tex){x.tex.dispose();x.tex=null}});
+    if(S.res<=4096)DIRS.forEach(d=>s.nav[d]&&setTimeout(()=>{const n=byId(s.nav[d]);n&&tex(n).catch(()=>{})},700))
+  }catch(e){busy(0);fadeT=1;err(e.message,()=>go(id,false))}}
+function navigate(d){const s=cur();if(s&&s.nav[d])go(s.nav[d])}
+function histBack(){const p=S.hist.pop();p?go(p,false):toast('No earlier location')}
+function busy(m){$('#busy').classList.toggle('on',!!m);if(m)$('#bt').textContent=m}
+function err(m,fn){$('#em').textContent=m;$('#err').classList.add('on');$('#retry').onclick=()=>{$('#err').classList.remove('on');fn()};$('#eb').onclick=()=>{$('#err').classList.remove('on');histBack()}}
+$$('.dpad [data-d]').forEach(b=>b.onclick=()=>navigate(b.dataset.d));$('#hb').onclick=histBack;
+const KEY={w:'forward',s:'back',a:'left',d:'right',arrowup:'forward',arrowdown:'back',arrowleft:'left',arrowright:'right'};
+addEventListener('keydown',e=>{if(!$('#studio').classList.contains('on')||/INPUT|SELECT/.test(e.target.tagName))return;const d=KEY[e.key.toLowerCase()];if(d){e.preventDefault();navigate(d)}});
+
+/* ---------- styling ---------- */
+const SL=[['b','Brightness',-.3,.3,.01],['c','Contrast',.5,1.8,.01],['s','Colour',0,2,.01],['w','Warmth',-1,1,.01],['rot','Heading',-180,180,1]];
+const PRE={Natural:[0,1,1,0],'Warm dusk':[-.03,1.1,1.1,.8],Cool:[0,1.05,.9,-.8],Mono:[0,1.1,0,0],Punchy:[.02,1.3,1.3,0]};
+const dstyle=()=>({b:0,c:1,s:1,w:0,rot:0});
+function applyStyle(){const s=cur();if(!s)return;const u=mat.uniforms;u.b.value=s.st.b;u.c.value=s.st.c;u.s.value=s.st.s;u.w.value=s.st.w;sphere.rotation.y=s.st.rot*Math.PI/180}
+$('#sls').innerHTML=SL.map(([k,n,a,b,st])=>`<label class="sl">${n}<input type="range" data-k="${k}" min="${a}" max="${b}" step="${st}"></label>`).join('');
+$$('#sls input').forEach(i=>i.oninput=()=>{const s=cur();if(!s)return;s.st[i.dataset.k]=+i.value;applyStyle()});
+$('#pre').innerHTML=Object.keys(PRE).map(k=>`<button data-p="${k}" style="flex:none;padding:5px 10px;font-size:13px">${k}</button>`).join('');
+$$('#pre button').forEach(b=>b.onclick=()=>{const s=cur();if(!s)return;const p=PRE[b.dataset.p];Object.assign(s.st,{b:p[0],c:p[1],s:p[2],w:p[3]});applyStyle();upd()});
+$('#all').onclick=()=>{const s=cur();if(!s)return;S.sc.forEach(x=>x.st={...s.st});toast('Style copied to all scenes')};
+
+/* ---------- scenes: upload, demo, link ---------- */
+const slug=()=>'s'+(++S.n);
+function add(name,url,pos,nav){const s={id:slug(),name,url,pos,nav:nav||{},st:dstyle()};S.sc.push(s);return s}
+function layout(i,n){const c=Math.ceil(Math.sqrt(Math.max(n,1)));return{x:.15+.7*((i%c)+.5)/c,y:.2+.6*((Math.floor(i/c))+.5)/c}}
+async function addFiles(fs){const imgs=[...fs].filter(f=>/^image\//.test(f.type));if(!imgs.length)return toast('Choose JPG, PNG or WebP images');
+  const first=!S.sc.length;imgs.forEach((f,i)=>add(f.name.replace(/\.[^.]+$/,''),URL.createObjectURL(f),layout(S.sc.length+i,S.sc.length+imgs.length)));
+  S.sc.forEach((s,i)=>s.pos=layout(i,S.sc.length));toast(imgs.length+' image'+(imgs.length>1?'s':'')+' added. Use Auto-link or set arrows on the right.');
+  if(first||!S.cur)go(S.sc[0].id);else upd()}
+$('#file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
+const dz=$('#stage');dz.ondragover=e=>e.preventDefault();dz.ondrop=e=>{e.preventDefault();addFiles(e.dataTransfer.files)};
+$('#auto').onclick=()=>{S.sc.forEach((s,i)=>{s.nav.forward=S.sc[i+1]?.id||null;s.nav.back=S.sc[i-1]?.id||null});upd();toast('Linked in order: forward is next, back is previous')};
+
+function demoPano(name,hue,seed){const c=document.createElement('canvas');c.width=2048;c.height=1024;const x=c.getContext('2d');
+  let g=x.createLinearGradient(0,0,0,512);g.addColorStop(0,`hsl(${hue},45%,18%)`);g.addColorStop(1,`hsl(${hue},55%,62%)`);x.fillStyle=g;x.fillRect(0,0,2048,512);
+  g=x.createLinearGradient(0,512,0,1024);g.addColorStop(0,'#59534b');g.addColorStop(1,'#1d1b19');x.fillStyle=g;x.fillRect(0,512,2048,512);
+  let r=seed;const rnd=()=>(r=(r*9301+49297)%233280)/233280;
+  for(let i=0;i<26;i++){const w=50+rnd()*110,h=60+rnd()*230,px=i*80;x.fillStyle=`hsl(${hue+20},12%,${28+rnd()*30}%)`;x.fillRect(px,512-h,w,h);x.fillStyle='rgba(255,255,255,.18)';for(let k=0;k<h-20;k+=22)x.fillRect(px+8,512-h+10+k,w-16,8)}
+  x.strokeStyle='rgba(255,255,255,.14)';for(let i=0;i<64;i++){x.beginPath();x.moveTo(1024,520);x.lineTo(i*32,1024);x.stroke()}
+  x.fillStyle='#fff';x.font='bold 84px sans-serif';x.textAlign='center';['Ahead','Right','Behind','Left'].forEach((t,i)=>{x.fillText(name,256+i*512,640);x.font='36px sans-serif';x.fillText('view '+(i+1),256+i*512,690);x.font='bold 84px sans-serif'});
+  return c.toDataURL('image/jpeg',.82)}
+$('#demo').onclick=()=>{if(S.sc.length&&!confirm('Add demo scenes to your current list?'))return;
+  const a=add('Main entrance',demoPano('Main entrance',210,3),{x:.5,y:.85}),b=add('Central street',demoPano('Central street',30,7),{x:.5,y:.52}),
+  h=add('Hawker street',demoPano('Hawker street',160,11),{x:.5,y:.18}),p=add('Puja market',demoPano('Puja market',330,5),{x:.18,y:.52}),v=add('Vegetable market',demoPano('Vegetable market',100,9),{x:.82,y:.52});
+  a.nav={forward:b.id};b.nav={back:a.id,forward:h.id,left:p.id,right:v.id};h.nav={back:b.id};p.nav={right:b.id};v.nav={left:b.id};go(a.id)};
+
+/* ---------- UI refresh ---------- */
+function upd(){
+  const s=cur();$('#empty').classList.toggle('on',!S.sc.length);$('#loc').textContent=s?s.name:'No scene';
+  $$('.dpad [data-d]').forEach(b=>b.disabled=!(s&&s.nav[b.dataset.d]));$('#hb').disabled=!S.hist.length;
+  $('#list').innerHTML=S.sc.length?'':'<p class="note">No scenes yet.</p>';
+  S.sc.forEach((x,i)=>{const d=document.createElement('div');d.className='it'+(x.id===S.cur?' on':'');
+    d.innerHTML=`<div>${x.name}<small>${x.ow?x.ow+'×'+x.oh+(x.rw&&x.rw<x.ow?' → '+x.rw+'×'+(x.rw>>1):''):'not loaded yet'}</small></div><button title="Remove" aria-label="Remove ${x.name}">×</button>`;
+    d.onclick=()=>go(x.id);d.ondblclick=()=>{const n=prompt('Scene name',x.name);if(n){x.name=n;upd()}};
+    d.querySelector('button').onclick=e=>{e.stopPropagation();del(x.id)};$('#list').appendChild(d)});
+  $('#lks').innerHTML=s?DIRS.map(d=>`<div class="lk"><span>${ARW[d]} ${d}</span><select data-d="${d}"><option value="">None</option>${S.sc.filter(x=>x.id!==s.id).map(x=>`<option value="${x.id}" ${s.nav[d]===x.id?'selected':''}>${x.name}</option>`).join('')}</select></div>`).join(''):'<p class="note">Add a scene first.</p>';
+  $$('#lks select').forEach(e=>e.onchange=()=>{s.nav[e.dataset.d]=e.value||null;upd()});
+  if(s)$$('#sls input').forEach(i=>i.value=s.st[i.dataset.k]);
+  drawMap();vrRedraw()}
+function del(id){const s=byId(id);if(s?.tex)s.tex.dispose();try{s&&s.url.startsWith('blob:')&&URL.revokeObjectURL(s.url)}catch(e){}
+  S.sc=S.sc.filter(x=>x.id!==id);S.sc.forEach(x=>DIRS.forEach(d=>x.nav[d]===id&&(x.nav[d]=null)));S.hist=S.hist.filter(h=>h!==id);
+  if(S.cur===id){S.cur=null;S.sc[0]?go(S.sc[0].id,false):(mat.uniforms.t.value=null,upd())}else upd()}
+
+/* ---------- map corner ---------- */
+const mp=$('#map'),mx=mp.getContext('2d'),MT=new THREE.CanvasTexture(mp);
+function drawMap(){const W=mp.width;mx.clearRect(0,0,W,W);mx.fillStyle='rgba(13,16,21,.88)';mx.fillRect(0,0,W,W);
+  mx.strokeStyle='rgba(255,255,255,.07)';mx.lineWidth=1;for(let i=1;i<6;i++){mx.beginPath();mx.moveTo(i*W/6,0);mx.lineTo(i*W/6,W);mx.moveTo(0,i*W/6);mx.lineTo(W,i*W/6);mx.stroke()}
+  mx.strokeStyle='rgba(138,180,255,.5)';mx.lineWidth=2;S.sc.forEach(s=>DIRS.forEach(d=>{const t=s.nav[d]&&byId(s.nav[d]);if(t){mx.beginPath();mx.moveTo(s.pos.x*W,s.pos.y*W);mx.lineTo(t.pos.x*W,t.pos.y*W);mx.stroke()}}));
+  mx.font='20px sans-serif';mx.textAlign='center';
+  S.sc.forEach(s=>{const on=s.id===S.cur,x=s.pos.x*W,y=s.pos.y*W;mx.beginPath();mx.arc(x,y,on?14:10,0,7);mx.fillStyle=on?'#8ab4ff':'#151922';mx.fill();mx.strokeStyle='#8ab4ff';mx.lineWidth=2;mx.stroke();mx.fillStyle='#eceff4';mx.fillText(s.name.slice(0,14),x,y+30)});
+  MT.needsUpdate=true}
+const pinAt=(x,y)=>{let b=null,m=.09;S.sc.forEach(s=>{const d=Math.hypot(s.pos.x-x,s.pos.y-y);if(d<m){m=d;b=s}});return b};
+let md=null;
+mp.onpointerdown=e=>{const r=mp.getBoundingClientRect(),p=pinAt((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);if(p){md={p,x:e.clientX,y:e.clientY,mv:false};mp.setPointerCapture(e.pointerId)}};
+mp.onpointermove=e=>{if(!md)return;if(Math.hypot(e.clientX-md.x,e.clientY-md.y)>4)md.mv=true;if(md.mv){const r=mp.getBoundingClientRect();md.p.pos={x:Math.max(.05,Math.min(.95,(e.clientX-r.left)/r.width)),y:Math.max(.05,Math.min(.95,(e.clientY-r.top)/r.height))};drawMap()}};
+mp.onpointerup=()=>{if(md&&!md.mv)go(md.p.id);md=null};
+
+/* ---------- VR: HUD + controllers + enter/exit ---------- */
+const hud=new THREE.Group();hud.position.set(0,-.55,-1.5);hud.rotation.x=-.35;hud.visible=false;sc.add(hud);
+const rr=(c,w,h,on)=>{c.clearRect(0,0,w,h);c.fillStyle=on?'rgba(13,16,21,.9)':'rgba(13,16,21,.45)';c.beginPath();c.roundRect(6,6,w-12,h-12,28);c.fill();c.strokeStyle=on?'#8ab4ff':'#444c5a';c.lineWidth=5;c.stroke()};
+const txt=(c,w,h,t,sz,col)=>{c.fillStyle=col||'#fff';c.font='bold '+sz+'px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(t,w/2,h/2)};
+function mk(w,h,x,y,draw,fn){const cv=document.createElement('canvas');cv.width=w*512;cv.height=h*512;const t=new THREE.CanvasTexture(cv);
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthTest:false}));m.position.set(x,y,0);m.renderOrder=9;m.userData={cv,t,draw,fn};hud.add(m);draw(cv.getContext('2d'),cv.width,cv.height);return m}
+const P={forward:[0,.34],back:[0,-.34],left:[-.34,0],right:[.34,0]};
+DIRS.forEach(d=>mk(.3,.3,P[d][0],P[d][1],(c,w,h)=>{const on=!!(cur()&&cur().nav[d]);rr(c,w,h,on);txt(c,w,h,ARW[d],110,on?'#fff':'#666')},()=>navigate(d)));
+mk(.24,.24,0,0,(c,w,h)=>{rr(c,w,h,S.hist.length>0);txt(c,w,h,'↩',80,S.hist.length?'#fff':'#666')},histBack);
+mk(1,.16,0,.64,(c,w,h)=>{rr(c,w,h,true);txt(c,w,h,'ARCHI VR  ·  '+(cur()?cur().name:'No scene'),44)},()=>{});
+mk(.34,.14,.72,.64,(c,w,h)=>{rr(c,w,h,true);txt(c,w,h,'Exit VR',42)},()=>R.xr.getSession()?.end());
+const mapM=new THREE.Mesh(new THREE.PlaneGeometry(.55,.55),new THREE.MeshBasicMaterial({map:MT,transparent:true,depthTest:false}));mapM.position.set(-.8,.2,0);mapM.renderOrder=9;
+mapM.userData.fn=h=>{const p=pinAt(h.uv.x,1-h.uv.y);if(p)go(p.id)};hud.add(mapM);
+function vrRedraw(){hud.children.forEach(m=>{const u=m.userData;if(u.draw){u.draw(u.cv.getContext('2d'),u.cv.width,u.cv.height);u.t.needsUpdate=true}})}
+for(let i=0;i<2;i++){const c=R.xr.getController(i);c.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,-3)]),new THREE.LineBasicMaterial({color:0x8ab4ff})));
+  c.addEventListener('selectstart',()=>{const ray=new THREE.Raycaster();ray.ray.origin.setFromMatrixPosition(c.matrixWorld);ray.ray.direction.set(0,0,-1).applyMatrix4(new THREE.Matrix4().extractRotation(c.matrixWorld));
+    const h=ray.intersectObjects(hud.children)[0];if(h&&h.object.userData.fn)h.object.userData.fn(h)});sc.add(c)}
+async function enterVR(){
+  if(!navigator.xr)return toast('WebXR is not available. Open this page in Meta Quest Browser.');
+  if(!S.sc.length)return toast('Add a 360° scene first');
+  try{if(!await navigator.xr.isSessionSupported('immersive-vr'))return toast('This device cannot start VR.');
+    const s=await navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor']});await R.xr.setSession(s)}catch(e){toast('Could not enter VR: '+e.message)}}
+$('#vr').onclick=enterVR;
+R.xr.addEventListener('sessionstart',()=>{hud.visible=true;vrRedraw()});R.xr.addEventListener('sessionend',()=>{hud.visible=false;resize()});
+$('#fs').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#stage').requestFullscreen?.();
+
+/* ---------- render loop (thumbstick flick = navigate) ---------- */
+let last=performance.now(),cool=0;
+R.setAnimationLoop(()=>{const n=performance.now(),dt=Math.min(.1,(n-last)/1000);last=n;
+  const u=mat.uniforms.f,dl=fadeT-u.value;u.value+=Math.sign(dl)*Math.min(Math.abs(dl),dt*5);
+  if(!R.xr.isPresenting)cam.rotation.set(pitch,yaw,0);
+  const ss=R.xr.getSession();if(ss&&n>cool)for(const src of ss.inputSources){const g=src.gamepad;if(!g||g.axes.length<4)continue;const x=g.axes[2],y=g.axes[3];
+    if(Math.abs(x)>.7||Math.abs(y)>.7){navigate(Math.abs(y)>Math.abs(x)?(y<0?'forward':'back'):(x<0?'left':'right'));cool=n+1000}
+    else if(g.buttons[5]&&g.buttons[5].pressed){hud.visible=!hud.visible;cool=n+500}}
+  R.render(sc,cam)});
+
+/* ---------- settings ---------- */
+const sd=$('#set');
+function resNote(){const w=Math.min(S.res,R.capabilities.maxTextureSize);$('#resn').textContent='Each scene uses about '+Math.round(w*(w/2)*4/1048576)+' MB of graphics memory. Start at 4096 on Quest and raise it if scenes still look soft. Your device allows up to '+R.capabilities.maxTextureSize+' px.'}
+$('#setBtn').onclick=()=>{$('#res').value=S.res;$('#snd').checked=S.snd;resNote();sd.showModal()};
+$('#res').onchange=e=>{S.res=+e.target.value;try{localStorage.setItem('archi-res',S.res)}catch(x){}resNote();S.sc.forEach(s=>{s.tex&&s.tex.dispose();s.tex=null});if(S.cur)go(S.cur,false)};
+$('#snd').onchange=e=>{S.snd=e.target.checked;try{localStorage.setItem('archi-snd',S.snd?'1':'0')}catch(x){}};
+$('#sx').onclick=()=>sd.close();
+$('#rst').onclick=()=>{if(!confirm('Remove all scenes and history?'))return;[...S.sc].forEach(s=>del(s.id));S.hist=[];sd.close();upd()};
+gshow(0);upd();
+</script>
 </body>
 </html>
