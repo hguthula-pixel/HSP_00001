@@ -105,6 +105,7 @@ dialog{border-radius:26px;border:2px solid var(--ln)}
 button:hover:not(:disabled){animation:wig .45s}@keyframes wig{25%{rotate:-3deg}75%{rotate:3deg}}
 #guide,aside{background-image:radial-gradient(rgba(139,92,246,.14) 2px,transparent 2px);background-size:22px 22px}
 .card{box-shadow:0 5px 0 rgba(139,92,246,.14)}.card b{font-family:'Fredoka','Nunito',sans-serif;font-size:17px}
+dialog input:not([type=checkbox]){background:var(--bg);border:2px solid var(--ln);border-radius:12px;padding:8px 10px;color:var(--tx)}
 @media(max-width:900px){body{overflow:auto}#studio.on{display:flex;flex-direction:column;height:auto;overflow:visible}.screen#studio{overflow:visible}#stage{height:64vh;flex:none;order:-1}aside{border:0;border-top:1px solid var(--ln)}.dpad{grid-template-columns:repeat(3,66px);grid-auto-rows:66px}#map{width:120px;height:120px}}
 </style>
 </head>
@@ -172,12 +173,13 @@ button:hover:not(:disabled){animation:wig .45s}@keyframes wig{25%{rotate:-3deg}7
 <section id="studio" class="screen">
  <aside>
   <b style="font-size:18px">Upload studio</b>
-  <label class="row" style="display:flex"><input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button class="pri" onclick="$('#file').click()">Upload images</button></label>
+  <label class="row" style="display:flex"><input id="file" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" multiple hidden><button class="pri" onclick="$('#file').click()">Upload images</button></label>
   <p class="note">Drop images anywhere on this page, or paste them with Ctrl+V.</p>
   <div class="row"><button id="demo">Load demo scenes</button><button id="auto">Auto-link</button></div>
   <h3>Scenes (double-click to rename)</h3>
   <div id="list"></div>
   <button id="qBtn">Connect Meta Quest 3</button>
+  <button id="syncBtn">Save to my account ☁️</button>
   <div class="row"><button id="guideBtn">Guide</button><button id="setBtn">Settings</button></div>
  </aside>
 
@@ -223,6 +225,13 @@ button:hover:not(:disabled){animation:wig .45s}@keyframes wig{25%{rotate:-3deg}7
     <select id="res"><option value="2048">2048 × 1024 (lightest)</option><option value="4096">4096 × 2048 (recommended)</option><option value="6144">6144 × 3072</option><option value="8192">8192 × 4096 (sharpest)</option></select>
   </label>
   <p class="note" id="resn"></p>
+  <h3 style="margin:14px 0 6px">Your Meta account ☁️</h3>
+  <p class="note" id="who"></p>
+  <label>Supabase project URL<input id="sbu" type="text" placeholder="https://abcd.supabase.co" autocomplete="off"></label>
+  <label>Supabase anon key<input id="sbk" type="password" placeholder="eyJ…" autocomplete="off"></label>
+  <div class="row"><button id="lin" class="pri">Log in with Meta</button><button id="lout">Log out</button></div>
+  <div class="row"><button id="csave">Save to my account</button><button id="cload">Load from my account</button></div>
+  <p class="note">Log in once on each device, then Save on one and Load on the other. Your data is stored only under your own account. The anon key is a public key, not a password.</p>
   <label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="snd"> Sound on (ambient audio is planned)</label>
   <div class="row"><button id="rst">Reset experience</button><button class="pri" id="sx">Done</button></div>
 </dialog>
@@ -241,7 +250,7 @@ const cur=()=>S.sc.find(s=>s.id===S.cur),byId=id=>S.sc.find(s=>s.id===id);
 /* ---------- start + guide ---------- */
 let gs=0;
 function gshow(n){gs=n;$$('.gstep').forEach((e,i)=>e.classList.toggle('on',i===n));$$('.dots i').forEach((e,i)=>e.classList.toggle('on',i===n));$('#gb').style.visibility=n?'visible':'hidden';$('#gn').textContent=n===1?'Open upload studio':'Connect Quest 3'}
-$('#enter').onclick=()=>{show('guide');gshow(0)};
+$('#enter').onclick=()=>{if(S.sc.length)show('studio');else{show('guide');gshow(0)}};
 $('#skip').onclick=()=>show('studio');
 $('#gb').onclick=()=>gshow(Math.max(0,gs-1));
 $('#gn').onclick=()=>gs===1?show('studio'):openQ();
@@ -291,11 +300,11 @@ gl.onwheel=e=>{e.preventDefault();cam.fov=Math.max(40,Math.min(100,cam.fov+e.del
 let fadeT=1;const fade=to=>{fadeT=to;return new Promise(r=>setTimeout(r,240))};
 
 /* ---------- textures / resolution ---------- */
-const loadImg=u=>new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('This image could not be read. Use a JPG, PNG or WebP file.'));i.src=u});
+const loadImg=u=>new Promise((ok,no)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>ok(i);i.onerror=()=>no(new Error('This image could not be read. Use a JPG, PNG or WebP file.'));i.src=u});
 async function tex(s){
   const W=Math.min(S.res,R.capabilities.maxTextureSize);if(s.tex&&s.tw===W)return s.tex;
-  const i=await loadImg(s.url);s.ow=i.naturalWidth;s.oh=i.naturalHeight;
-  const w=Math.min(W,i.naturalWidth),h=w>>1,cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(i,0,0,w,h);
+  const i=await(async()=>{if(s.blob&&window.createImageBitmap)try{return await createImageBitmap(s.blob)}catch(e){}return loadImg(s.url)})();s.ow=i.naturalWidth||i.width;s.oh=i.naturalHeight||i.height;
+  const w=Math.min(W,s.ow),h=w>>1,cv=document.createElement('canvas');cv.width=w;cv.height=h;const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.drawImage(i,0,0,w,h);i.close&&i.close();
   if(s.tex)s.tex.dispose();const t=new THREE.CanvasTexture(cv);t.minFilter=THREE.LinearFilter;t.generateMipmaps=false;t.anisotropy=4;
   s.tex=t;s.tw=W;s.rw=w;return t}
 
@@ -322,17 +331,17 @@ const PRE={Natural:[0,1,1,0],'Warm dusk':[-.03,1.1,1.1,.8],Cool:[0,1.05,.9,-.8],
 const dstyle=()=>({b:0,c:1,s:1,w:0,rot:0});
 function applyStyle(){const s=cur();if(!s)return;const u=mat.uniforms;u.b.value=s.st.b;u.c.value=s.st.c;u.s.value=s.st.s;u.w.value=s.st.w;sphere.rotation.y=s.st.rot*Math.PI/180}
 $('#sls').innerHTML=SL.map(([k,n,a,b,st])=>`<label class="sl">${n}<input type="range" data-k="${k}" min="${a}" max="${b}" step="${st}"></label>`).join('');
-$$('#sls input').forEach(i=>i.oninput=()=>{const s=cur();if(!s)return;s.st[i.dataset.k]=+i.value;applyStyle()});
+$$('#sls input').forEach(i=>i.oninput=()=>{const s=cur();if(!s)return;s.st[i.dataset.k]=+i.value;applyStyle();save()});
 $('#pre').innerHTML=Object.keys(PRE).map(k=>`<button data-p="${k}" style="flex:none;padding:5px 10px;font-size:13px">${k}</button>`).join('');
 $$('#pre button').forEach(b=>b.onclick=()=>{const s=cur();if(!s)return;const p=PRE[b.dataset.p];Object.assign(s.st,{b:p[0],c:p[1],s:p[2],w:p[3]});applyStyle();upd()});
-$('#all').onclick=()=>{const s=cur();if(!s)return;S.sc.forEach(x=>x.st={...s.st});toast('Style copied to all scenes')};
+$('#all').onclick=()=>{const s=cur();if(!s)return;S.sc.forEach(x=>x.st={...s.st});save();toast('Style copied to all scenes')};
 
 /* ---------- scenes: upload, demo, link ---------- */
 const slug=()=>'s'+(++S.n);
 function add(name,url,pos,nav){const s={id:slug(),name,url,pos,nav:nav||{},st:dstyle()};S.sc.push(s);return s}
 function layout(i,n){return{x:.5,y:n<2?.5:.85-.7*i/(n-1)}}
-async function addFiles(fs){const imgs=[...fs].filter(f=>/^image\//.test(f.type));if(!imgs.length)return toast('Choose JPG, PNG or WebP images');
-  const first=!S.sc.length;imgs.forEach((f,i)=>add(f.name&&f.name!=='image.png'?f.name.replace(/\.[^.]+$/,''):'Pasted image '+(S.n+1),URL.createObjectURL(f),layout(S.sc.length+i,S.sc.length+imgs.length)));
+async function addFiles(fs){const imgs=[...fs].filter(f=>/^image\//.test(f.type)||/\.(png|jpe?g|webp)$/i.test(f.name));if(!imgs.length)return toast('Choose JPG, PNG or WebP images');
+  const first=!S.sc.length;imgs.forEach((f,i)=>{const g=f.type?f:new Blob([f],{type:'image/'+(/\.png$/i.test(f.name)?'png':/\.webp$/i.test(f.name)?'webp':'jpeg')});add(f.name&&f.name!=='image.png'?f.name.replace(/\.[^.]+$/,''):'Pasted image '+(S.n+1),URL.createObjectURL(g),layout(S.sc.length+i,S.sc.length+imgs.length)).blob=g});
   const old=S.sc.length-imgs.length;S.sc.forEach((s,i)=>{s.pos=layout(i,S.sc.length);if(i>=old&&i>0){const p=S.sc[i-1];if(!s.nav.back)s.nav.back=p.id;if(!p.nav.forward)p.nav.forward=s.id}});toast(imgs.length+' image'+(imgs.length>1?'s':'')+' added'+(S.sc.length>1?' and linked in order. Click the floor circles to move.':'. Add one more image to get moving arrows.'));
   if(first||!S.cur)go(S.sc[0].id);else upd()}
 $('#file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
@@ -351,7 +360,7 @@ function demoPano(name,hue,seed){const c=document.createElement('canvas');c.widt
 $('#demo').onclick=()=>{if(S.sc.length&&!confirm('Add demo scenes to your current list?'))return;
   const a=add('Main entrance',demoPano('Main entrance',210,3),{x:.5,y:.85}),b=add('Central street',demoPano('Central street',30,7),{x:.5,y:.52}),
   h=add('Hawker street',demoPano('Hawker street',160,11),{x:.5,y:.18}),p=add('Puja market',demoPano('Puja market',330,5),{x:.18,y:.52}),v=add('Vegetable market',demoPano('Vegetable market',100,9),{x:.82,y:.52});
-  a.nav={forward:b.id};b.nav={back:a.id,forward:h.id,left:p.id,right:v.id};h.nav={back:b.id};p.nav={right:b.id};v.nav={left:b.id};go(a.id)};
+  a.nav={forward:b.id};b.nav={back:a.id,forward:h.id,left:p.id,right:v.id};h.nav={back:b.id};p.nav={right:b.id};v.nav={left:b.id};[a,b,h,p,v].forEach(s=>fetch(s.url).then(r=>r.blob()).then(bl=>{s.blob=bl;save()}).catch(()=>{}));go(a.id)};
 
 /* ---------- UI refresh ---------- */
 function upd(){
@@ -365,8 +374,8 @@ function upd(){
   $('#lks').innerHTML=s?DIRS.map(d=>`<div class="lk"><span>${ARW[d]} ${d}</span><select data-d="${d}"><option value="">None</option>${S.sc.filter(x=>x.id!==s.id).map(x=>`<option value="${x.id}" ${s.nav[d]===x.id?'selected':''}>${x.name}</option>`).join('')}</select></div>`).join(''):'<p class="note">Add a scene first.</p>';
   $$('#lks select').forEach(e=>e.onchange=()=>{s.nav[e.dataset.d]=e.value||null;upd()});
   if(s)$$('#sls input').forEach(i=>i.value=s.st[i.dataset.k]);
-  drawMap();vrRedraw();buildArrows()}
-function del(id){const s=byId(id);if(s?.tex)s.tex.dispose();try{s&&s.url.startsWith('blob:')&&URL.revokeObjectURL(s.url)}catch(e){}
+  drawMap();vrRedraw();buildArrows();save()}
+function del(id){kv('del','img:'+id);const s=byId(id);if(s?.tex)s.tex.dispose();try{s&&s.url.startsWith('blob:')&&URL.revokeObjectURL(s.url)}catch(e){}
   S.sc=S.sc.filter(x=>x.id!==id);S.sc.forEach(x=>DIRS.forEach(d=>x.nav[d]===id&&(x.nav[d]=null)));S.hist=S.hist.filter(h=>h!==id);
   if(S.cur===id){S.cur=null;S.sc[0]?go(S.sc[0].id,false):(mat.uniforms.t.value=null,upd())}else upd()}
 
@@ -382,7 +391,7 @@ const pinAt=(x,y)=>{let b=null,m=.09;S.sc.forEach(s=>{const d=Math.hypot(s.pos.x
 let md=null;
 mp.onpointerdown=e=>{const r=mp.getBoundingClientRect(),p=pinAt((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height);if(p){md={p,x:e.clientX,y:e.clientY,mv:false};mp.setPointerCapture(e.pointerId)}};
 mp.onpointermove=e=>{if(!md)return;if(Math.hypot(e.clientX-md.x,e.clientY-md.y)>4)md.mv=true;if(md.mv){const r=mp.getBoundingClientRect();md.p.pos={x:Math.max(.05,Math.min(.95,(e.clientX-r.left)/r.width)),y:Math.max(.05,Math.min(.95,(e.clientY-r.top)/r.height))};drawMap();buildArrows()}};
-mp.onpointerup=()=>{if(md&&!md.mv)go(md.p.id);md=null};
+mp.onpointerup=()=>{if(md){md.mv?save():go(md.p.id)}md=null};
 
 /* ---------- VR: HUD + controllers + enter/exit ---------- */
 const hud=new THREE.Group();hud.position.set(0,-.55,-1.5);hud.rotation.x=-.35;hud.visible=false;sc.add(hud);
@@ -420,19 +429,90 @@ R.setAnimationLoop(()=>{const n=performance.now(),dt=Math.min(.1,(n-last)/1000);
     else if(g.buttons[5]&&g.buttons[5].pressed){hud.visible=!hud.visible;cool=n+500}}
   R.render(sc,cam)});
 
+/* ---------- saving: this device (IndexedDB) + cloud (GitHub repo) ---------- */
+const idb=new Promise((ok,no)=>{try{const r=indexedDB.open('liimy',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}});
+const kv=(m,k,v)=>idb.then(d=>new Promise((ok,no)=>{const o=d.transaction('kv',m==='get'?'readonly':'readwrite').objectStore('kv');const q=m==='get'?o.get(k):m==='del'?o.delete(k):o.put(v,k);q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)})).catch(()=>{});
+let ready=false,svT;
+const meta=()=>({n:S.n,cur:S.cur,sc:S.sc.map(s=>({id:s.id,name:s.name,pos:s.pos,nav:s.nav,st:s.st,remote:s.remote||null}))});
+function save(){if(!ready)return;clearTimeout(svT);svT=setTimeout(async()=>{for(const s of S.sc)if(s.blob&&!s.saved){await kv('put','img:'+s.id,s.blob);s.saved=1}await kv('put','meta',meta())},400)}
+async function restore(){const m=await kv('get','meta');
+  if(m&&m.sc&&m.sc.length){S.n=m.n||0;for(const x of m.sc){const b=await kv('get','img:'+x.id);if(!b)continue;S.sc.push({...x,url:b?URL.createObjectURL(b):x.remote,blob:b||null,saved:1})}}
+  ready=true;if(S.sc.length){go(m.cur&&byId(m.cur)?m.cur:S.sc[0].id,false);toast('Welcome back! Your scenes were saved.');return true}return false}
+const RK='limy-repo',TK='limy-tok';
+const lsg=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}},lss=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const guess=()=>{const m=location.hostname.match(/^(.+)\.github\.io$/),p=location.pathname.split('/')[1];return m&&p?m[1]+'/'+p:''};
+const repoN=()=>(lsg(RK)||guess()).trim();
+const b64=b=>new Promise(ok=>{const f=new FileReader();f.onload=()=>ok(f.result.split(',')[1]);f.readAsDataURL(b)});
+async function gh(path,opt={}){const t=lsg(TK).trim();return fetch('https://api.github.com/repos/'+repoN()+path,{...opt,headers:{Accept:'application/vnd.github+json',...(t?{Authorization:'Bearer '+t}:{}),...(opt.headers||{})}})}
+async function put(path,content,msg){let sha;const g=await gh('/contents/'+path);if(g.ok)sha=(await g.json()).sha;const r=await gh('/contents/'+path,{method:'PUT',body:JSON.stringify({message:msg,content,sha})});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.message||('GitHub error '+r.status))}}
+async function cloudSave(){
+  if(!repoN()||!lsg(TK)){toast('Add your repo and token in Settings first');openSet();return}
+  busy('Saving to the cloud…');
+  try{const rep=await(await gh('')).json(),br=rep.default_branch||'main';
+    for(const s of S.sc){if(s.remote||!s.blob)continue;const ext=(s.blob.type.split('/')[1]||'jpg').replace('jpeg','jpg'),f='liimy/'+s.id+'-'+Date.now().toString(36)+'.'+ext;busy('Uploading '+s.name+'…');await put(f,await b64(s.blob),'Add '+s.name);s.remote='https://raw.githubusercontent.com/'+repoN()+'/'+br+'/'+f}
+    busy('Saving map and links…');await put('liimy/project.json',btoa(unescape(encodeURIComponent(JSON.stringify(meta())))),'Update Liimy Land project');
+    busy(0);toast('Saved to the cloud. Your Quest can load it now.');save()}
+  catch(e){busy(0);err('Could not save: '+e.message,cloudSave)}}
+async function cloudLoad(quiet){const r=repoN();if(!r)return quiet||toast('Add your GitHub repo in Settings first');
+  try{const x=await fetch('https://api.github.com/repos/'+r+'/contents/liimy/project.json',{headers:{Accept:'application/vnd.github.raw'}});
+    if(!x.ok)throw new Error(x.status===404?'Nothing saved in the cloud yet':'GitHub error '+x.status);
+    const m=await x.json();S.sc.forEach(s=>s.tex&&s.tex.dispose());S.sc=[];S.hist=[];S.cur=null;S.n=m.n||0;
+    m.sc.forEach(s=>S.sc.push({...s,url:s.remote,blob:null,saved:1}));
+    if(S.sc.length)go(m.cur&&byId(m.cur)?m.cur:S.sc[0].id,false);else upd();
+    toast('Loaded '+S.sc.length+' scene'+(S.sc.length===1?'':'s')+' from the cloud')}
+  catch(e){quiet||toast('Could not load: '+e.message)}}
+
+/* ---------- Meta account login (Supabase storage + Facebook/Meta login) ---------- */
+const SBK='limy-sb';
+const sbCfg=()=>{try{return JSON.parse(lsg(SBK)||'{}')}catch(e){return {}}};
+let AU=null;try{AU=JSON.parse(lsg('limy-au')||'null')}catch(e){}
+const saveAU=()=>lss('limy-au',AU?JSON.stringify(AU):'');
+function acctUI(){$('#who').textContent=AU?'Signed in as '+(AU.name||'your Meta account'):'Not signed in';$('#lin').style.display=AU?'none':'';$('#lout').style.display=AU?'':'none'}
+async function sbFetch(path,opt={}){const c=sbCfg();if(!c.url||!c.key)throw new Error('Add your Supabase URL and key in Settings');
+  if(AU&&AU.refresh&&Date.now()>AU.exp-60000){const r=await fetch(c.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:c.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:AU.refresh})});
+    if(r.ok){const j=await r.json();AU={...AU,access:j.access_token,refresh:j.refresh_token,exp:Date.now()+j.expires_in*1000};saveAU()}else{AU=null;saveAU();acctUI()}}
+  if(!AU)throw new Error('Log in with Meta first');
+  return fetch(c.url+path,{...opt,headers:{apikey:c.key,Authorization:'Bearer '+AU.access,...(opt.headers||{})}})}
+function metaLogin(){const c=sbCfg();if(!c.url||!c.key)return toast('Add your Supabase URL and key first');location.href=c.url+'/auth/v1/authorize?provider=facebook&redirect_to='+encodeURIComponent(location.origin+location.pathname)}
+async function catchLogin(){const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('error_description')){toast('Login problem: '+h.get('error_description'));history.replaceState(null,'',location.pathname+location.search);return}
+  if(!h.get('access_token'))return;
+  AU={access:h.get('access_token'),refresh:h.get('refresh_token'),exp:Date.now()+(+h.get('expires_in')||3600)*1000};history.replaceState(null,'',location.pathname+location.search);
+  try{const u=await(await sbFetch('/auth/v1/user')).json();AU.id=u.id;AU.name=(u.user_metadata&&(u.user_metadata.full_name||u.user_metadata.name))||u.email||'';saveAU();toast('Logged in. Welcome!')}catch(e){AU=null;toast('Login failed: '+e.message)}acctUI()}
+async function acctSave(){if(!AU){toast('Log in with Meta first');openSet();return}
+  busy('Saving to your account…');
+  try{for(const s of S.sc){if(s.remote||!s.blob)continue;const ext=(s.blob.type.split('/')[1]||'jpg').replace('jpeg','jpg'),p=AU.id+'/'+s.id+'-'+Date.now().toString(36)+'.'+ext;busy('Uploading '+s.name+'…');
+      const r=await sbFetch('/storage/v1/object/liimy/'+p,{method:'POST',headers:{'Content-Type':s.blob.type||'image/jpeg','x-upsert':'true'},body:s.blob});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).message||('Upload failed ('+r.status+')'));s.remote=p}
+    busy('Saving map and links…');const r=await sbFetch('/storage/v1/object/liimy/'+AU.id+'/project.json',{method:'POST',headers:{'Content-Type':'application/json','x-upsert':'true'},body:JSON.stringify(meta())});if(!r.ok)throw new Error('Could not save the project ('+r.status+')');
+    busy(0);toast('Saved to your account.');save()}catch(e){busy(0);err('Could not save: '+e.message,acctSave)}}
+async function acctLoad(quiet){if(!AU||!sbCfg().url)return quiet||toast('Log in with Meta first');const B=m=>quiet||busy(m);
+  try{B('Loading from your account…');const r=await sbFetch('/storage/v1/object/authenticated/liimy/'+AU.id+'/project.json');if(!r.ok)throw new Error(r.status===400||r.status===404?'Nothing saved in your account yet':'Error '+r.status);
+    const m=await r.json(),list=[];
+    for(const x of m.sc){B('Loading '+x.name+'…');const q=await sbFetch('/storage/v1/object/authenticated/liimy/'+x.remote);if(!q.ok)continue;const b=await q.blob();list.push({...x,url:URL.createObjectURL(b),blob:b,saved:0})}
+    busy(0);S.sc.forEach(s=>s.tex&&s.tex.dispose());S.sc=list;S.hist=[];S.cur=null;S.n=m.n||0;
+    if(S.sc.length)go(m.cur&&byId(m.cur)?m.cur:S.sc[0].id,false);else upd();
+    toast('Loaded '+S.sc.length+' scene'+(S.sc.length===1?'':'s')+' from your account')}
+  catch(e){busy(0);quiet||toast('Could not load: '+e.message)}}
+
 /* ---------- settings ---------- */
 const sd=$('#set');
 function resNote(){const w=Math.min(S.res,R.capabilities.maxTextureSize);$('#resn').textContent='Each scene uses about '+Math.round(w*(w/2)*4/1048576)+' MB of graphics memory. Start at 4096 on Quest and raise it if scenes still look soft. Your device allows up to '+R.capabilities.maxTextureSize+' px.'}
-$('#setBtn').onclick=()=>{$('#res').value=S.res;$('#snd').checked=S.snd;resNote();sd.showModal()};
+const openSet=()=>{$('#res').value=S.res;$('#snd').checked=S.snd;const c=sbCfg();$('#sbu').value=c.url||'';$('#sbk').value=c.key||'';acctUI();resNote();sd.showModal()};$('#setBtn').onclick=openSet;
 $('#res').onchange=e=>{S.res=+e.target.value;try{localStorage.setItem('archi-res',S.res)}catch(x){}resNote();S.sc.forEach(s=>{s.tex&&s.tex.dispose();s.tex=null});if(S.cur)go(S.cur,false)};
 $('#snd').onchange=e=>{S.snd=e.target.checked;try{localStorage.setItem('archi-snd',S.snd?'1':'0')}catch(x){}};
-$('#sx').onclick=()=>sd.close();
+const putCfg=()=>lss(SBK,JSON.stringify({url:$('#sbu').value.trim().replace(/\/$/,''),key:$('#sbk').value.trim()}));
+$('#sx').onclick=()=>{putCfg();sd.close()};
+$('#lin').onclick=()=>{putCfg();metaLogin()};
+$('#lout').onclick=()=>{AU=null;saveAU();acctUI();toast('Logged out. Scenes stay on this device.')};
+$('#csave').onclick=()=>{putCfg();sd.close();acctSave()};
+$('#cload').onclick=()=>{putCfg();sd.close();if(!S.sc.length||confirm('Replace the scenes on this device with the version saved in your account?'))acctLoad()};
+$('#syncBtn').onclick=acctSave;
 $('#rst').onclick=()=>{if(!confirm('Remove all scenes and history?'))return;[...S.sc].forEach(s=>del(s.id));S.hist=[];sd.close();upd()};
 const qd=$('#qd');
 function openQ(){qd.showModal();$('#chk').click()}
 $('#qc').onclick=()=>{qd.close();if($('#guide').classList.contains('on'))gshow(1)};
 $('#qBtn').onclick=openQ;
-gshow(0);upd();
+gshow(0);upd();catchLogin().then(()=>restore()).then(ok=>{if(!ok)acctLoad(true)});acctUI();
 </script>
 </body>
 </html>
