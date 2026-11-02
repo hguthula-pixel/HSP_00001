@@ -1,0 +1,20 @@
+{
+  "name": "poorna-market",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An immersive, browser-based interpretation of Poorna Market, Visakhapatnam.",
+  "type": "module",
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "start": "node scripts/serve.mjs",
+    "test": "playwright test",
+    "test:update": "playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@fontsource-variable/fredoka": "5.3.0",
+    "@playwright/test": "1.64.1",
+    "aframe": "1.8.0",
+    "iwer": "2.6.0"
+  }
+}
