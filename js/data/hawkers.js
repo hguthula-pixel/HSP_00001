@@ -1,3 +1,4 @@
+import { inLot, clampToMarket } from './market.js';
 // Liimy Land: the hawker carts down the middle of the road, the walkways on
 // either side, and the walkable area. Metres; the street runs from the gate
 // (z ≈ +3) toward −Z.
@@ -215,6 +216,8 @@ const RADIUS = 0.3; // the visitor's body
  * and never inside a cart. Gaps between carts let visitors cross the road.
  */
 export function clampToWalk(x, z) {
+  // West of the walkway, alongside the market block: walk into the forecourt and the shops.
+  if (inLot(x, z)) return clampToMarket(x, z);
   let px = Math.min(BOUNDS.maxX, Math.max(BOUNDS.minX, x));
   let pz = Math.min(BOUNDS.maxZ, Math.max(BOUNDS.minZ, z));
   for (const c of CARTS) {

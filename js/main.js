@@ -193,6 +193,7 @@ async function boot() {
         const dir = new window.AFRAME.THREE.Vector3();
         sceneEl.camera.getWorldDirection(dir);
         app.minimap.update(head.x, head.z, Math.atan2(-dir.x, -dir.z));
+        app.world.market.update(head.x, head.z);
       }
     });
     sceneEl.addEventListener('enter-vr', () => {
@@ -249,6 +250,10 @@ $('about').addEventListener('close', () => {
   if (app.phase === 'about') showModes();
 });
 $('about-ok').addEventListener('click', () => about.close());
+
+function exitVR() {
+  if (app.sceneEl && app.sceneEl.is('vr-mode')) app.sceneEl.exitVR();
+}
 
 function enterVR() {
   if (app.sceneEl && app.xrSupported && !app.sceneEl.is('vr-mode')) app.sceneEl.enterVR();
@@ -393,6 +398,7 @@ $('mode-interact').addEventListener('click', () => enterInteract());
 $('mode-look-vr').addEventListener('click', () => enterLook({ vr: true }));
 $('mode-interact-vr').addEventListener('click', () => enterInteract({ vr: true }));
 $('vr-enter').addEventListener('click', enterVR);
+$('vr-exit').addEventListener('click', exitVR);
 $('home').addEventListener('click', home);
 $('retry').addEventListener('click', () => location.reload());
 $('lite').addEventListener('click', () => {
@@ -407,7 +413,11 @@ $('cart-prev').addEventListener('click', () => app.tour.prev());
 $('cart-next').addEventListener('click', () => app.tour.next());
 ui.el.select.addEventListener('change', () => {
   const v = ui.el.select.value;
-  if (v !== '') app.tour.go(Number(v));
+  if (v === 'market') {
+    // stand in the forecourt, facing the market's main entrance (west)
+    ui.hideCart();
+    app.nav.glideTo(-8.5, -55.6, Math.PI / 2);
+  } else if (v !== '') app.tour.go(Number(v));
 });
 $('cart-card-close').addEventListener('click', () => ui.hideCart());
 ui.el.putBasket.addEventListener('click', putInBasket);

@@ -88,3 +88,79 @@ test('releasing an item away from the basket sends it back to its cart', async (
     })
     .toBeLessThan(0.01);
 });
+
+test('in VR: walk into a market shop, grab an item there, and leave with Exit VR', async ({ page }) => {
+  await emulateQuest(page);
+  await toModes(page);
+  await page.locator('#mode-interact-vr').click();
+  await expect.poll(() => page.evaluate(() => window.__liimy.inVR), { timeout: 60_000 }).toBe(true);
+
+  // the on-screen Exit VR button shows only during the session
+  await expect(page.locator('#vr-exit')).toBeVisible();
+  await expect(page.locator('#vr-enter')).toBeHidden();
+
+  // stand at a shop's door and walk in with the left thumbstick (shop doors face the court)
+  const shop = await page.evaluate(async () => {
+    const m = await import('/js/data/market.js');
+    const s = m.SHOPS.find((x) => x.nx === -1 && x.open);
+    return { door: s.door, i: s.index };
+  });
+  await page.evaluate((d) => {
+    const THREE = window.AFRAME.THREE;
+    const r = document.getElementById('rig').object3D;
+    const cam = document.getElementById('cam').object3D;
+    r.position.set(0, 0, 0);
+    r.rotation.y = 0;
+    r.updateMatrixWorld(true);
+    // turn the rig so the emulated HEAD faces +X (into the shop), whatever its own yaw
+    const back = cam.getWorldDirection(new THREE.Vector3());
+    r.rotation.y = Math.PI / 2 - Math.atan2(-back.x, -back.z);
+    r.updateMatrixWorld(true);
+    // and line the head (not the rig) up with the doorway: the headset sits off the rig's centre
+    const h = new THREE.Vector3();
+    cam.getWorldPosition(h);
+    r.position.set(d[0] - 1.2 - h.x, 0, d[1] - h.z);
+  }, shop.door);
+  await page.evaluate(() => window.__xr.controllers.left.updateAxes('thumbstick', 0, -1));
+  // software WebGL runs at a few frames a second, so walk until the head is past the door
+  const headX = () =>
+    page.evaluate(() => {
+      const h = new window.AFRAME.THREE.Vector3();
+      document.getElementById('cam').object3D.getWorldPosition(h);
+      return h.x;
+    });
+  await expect.poll(headX, { timeout: 60_000 }).toBeGreaterThan(shop.door[0] + 0.3); // inside the shop
+  await page.evaluate(() => window.__xr.controllers.left.updateAxes('thumbstick', 0, 0));
+
+  // grab the first item on the counter
+  const id = `shop${shop.i}-0`;
+  const rig = await page.evaluate(() => window.__liimy.rigPosition());
+  await reachFor(page, id, rig);
+  await squeeze(page, 'right', 1);
+  // lift the hand 30 cm: a grabbed item comes along
+  await page.evaluate(() => window.__xr.controllers.right.position.y += 0.3);
+  await page.waitForTimeout(1500);
+  const moved = await page.evaluate((i) => {
+    const a = window.__liimy.itemWorld(i);
+    const h = window.__liimy.homeWorld(i);
+    return Math.hypot(a.x - h.x, a.y - h.y, a.z - h.z);
+  }, id);
+  expect(moved).toBeGreaterThan(0.2); // the item left the counter and follows the hand
+  await squeeze(page, 'right', 0);
+
+  // Exit VR with the floating in-headset button: touch it with the right controller and squeeze
+  await page.evaluate(() => {
+    const THREE = window.AFRAME.THREE;
+    const btn = document.getElementById('rig').object3D.getObjectByName('vr-exit-button');
+    const rig = document.getElementById('rig').object3D;
+    const w = btn.getWorldPosition(new THREE.Vector3());
+    const local = rig.worldToLocal(w);
+    // the grab anchor sits 6 cm in front of the grip (−Z of the controller)
+    window.__xr.controllers.right.quaternion.set(0, 0, 0, 1);
+    window.__xr.controllers.right.position.set(local.x, local.y + 0.02, local.z + 0.06);
+  });
+  await page.waitForTimeout(1500);
+  await squeeze(page, 'right', 1);
+  await expect.poll(() => page.evaluate(() => window.__liimy.inVR)).toBe(false);
+  await expect(page.locator('#vr-exit')).toBeHidden();
+});

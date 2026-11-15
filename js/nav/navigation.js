@@ -102,7 +102,8 @@ export function registerNavigation() {
      * pickable items (`getItems` is called per click because items move).
      */
     setPickTargets(floor, hitboxes, onPick, getItems = () => []) {
-      this.floor = floor;
+      this.floors = [].concat(floor);
+      this.floor = this.floors[0];
       this.hitboxes = hitboxes;
       this.getItems = getItems;
       this.onPick = onPick;
@@ -114,10 +115,10 @@ export function registerNavigation() {
       this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
       this.raycaster.setFromCamera(this.ndc, this.el.sceneEl.camera);
       const items = this.getItems();
-      const hits = this.raycaster.intersectObjects([this.floor, ...this.hitboxes, ...items], false);
+      const hits = this.raycaster.intersectObjects([...this.floors, ...this.hitboxes, ...items], false);
       if (!hits.length) return;
       // Items sit inside their cart's hit box, so an item anywhere along the ray wins over the cart.
-      const floorHit = hits.find((h) => h.object === this.floor);
+      const floorHit = hits.find((h) => this.floors.includes(h.object));
       const itemHit = hits.find((h) => h.object.userData.pickable);
       if (itemHit && (!floorHit || itemHit.distance < floorHit.distance + 0.01)) {
         this.onPick({ type: 'item', item: itemHit.object.userData.pickable });
@@ -126,7 +127,7 @@ export function registerNavigation() {
       const hit = hits[0];
       if (hit.object.userData.cartIndex !== undefined) {
         this.onPick({ type: 'cart', index: hit.object.userData.cartIndex });
-      } else if (hit.object === this.floor) {
+      } else if (this.floors.includes(hit.object)) {
         this.glideTo(hit.point.x, hit.point.z);
         this.onPick({ type: 'ground', point: { x: hit.point.x, z: hit.point.z } });
       }

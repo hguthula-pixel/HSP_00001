@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = Number(process.env.TEST_PORT) || 4173; // TEST_PORT when 4173 is taken by another project
 
 export default defineConfig({
   testDir: 'tests',

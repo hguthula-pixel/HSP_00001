@@ -893,3 +893,8 @@ body[data-state="interact"] .bar__look {
     display: none;
   }
 }
+
+/* Exit VR: only while an immersive session is running (the headset also shows one in 3D). */
+.vr-exit { display: none; }
+body[data-vr] .vr-exit { display: inline-flex; }
+body[data-vr] #vr-enter { display: none; }
