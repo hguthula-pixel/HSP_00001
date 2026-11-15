@@ -2,6 +2,7 @@
 // window frames, little balconies, ground-floor shopfronts, rooftop tanks.
 import { THREE, Batcher, InstanceSet, geo, matrix, rng, canvasTexture } from './kit.js';
 import { STREET } from '../data/hawkers.js';
+import { LOT } from '../data/market.js';
 import { toon, outlineMat, addOutline, signMesh, PALETTE, INK } from './toon.js';
 
 export const FLOOR_H = 3.0;
@@ -40,6 +41,12 @@ export function buildBuildings(root) {
       const face = side * STREET.buildingX;
       const depth = 9;
       const h = ROOF + (b % 3 === 1 ? 0.6 : 0);
+      // the west side gives way to the G+3 market block (scene/market.js)
+      if (side < 0 && z - w < LOT.maxZ + 0.5 && z > LOT.minZ - 0.5) {
+        z -= w;
+        b++;
+        continue;
+      }
 
       // body and parapet
       B.box(wall, face + side * depth / 2, h / 2, cz, depth, h, w - 0.08, { outline: 0.04 });

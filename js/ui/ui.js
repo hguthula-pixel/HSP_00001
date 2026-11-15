@@ -74,6 +74,10 @@ export function createUI() {
         o.textContent = `${c.index + 1}. ${c.name}`;
         el.select.append(o);
       }
+      const m = document.createElement('option');
+      m.value = 'market';
+      m.textContent = 'Liimy Market (entrance)';
+      el.select.append(m);
       el.nowebglList.replaceChildren(
         ...carts.map((c) => {
           const li = document.createElement('li');

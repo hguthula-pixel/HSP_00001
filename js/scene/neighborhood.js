@@ -3,6 +3,19 @@
 // Kept lighter than the market itself so Quest headsets hold their frame rate.
 import { THREE, Batcher, InstanceSet, geo, mat, matrix, rng } from './kit.js';
 import { toon, outlineMat, addOutline } from './toon.js';
+import { LOT } from '../data/market.js';
+
+// Anything west of the street inside the market block's lot is left out.
+const M = { x1: LOT.minX - 2, x2: -7, z1: LOT.minZ - 2, z2: LOT.maxZ + 2 };
+const blocked = (x, z, hw = 0, hd = 0) => x + hw > M.x1 && x - hw < M.x2 && z + hd > M.z1 && z - hd < M.z2;
+/** Splits a north–south strip around the market lot. */
+function splitStrip(x, z, w, d) {
+  if (!blocked(x, z, w / 2, d / 2)) return [[x, z, w, d]];
+  const top = z + d / 2, bot = z - d / 2, out = [];
+  if (top > M.z2) out.push([x, (top + M.z2) / 2, w, top - M.z2]);
+  if (bot < M.z1) out.push([x, (bot + M.z1) / 2, w, M.z1 - bot]);
+  return out;
+}
 
 const WALLS = ['#FFD6E0', '#FFE7B8', '#D7F0E3', '#E3DBFF', '#FFD0B5', '#CFEFFF', '#FFF0C9', '#F6D2FF'];
 
@@ -30,7 +43,8 @@ export function buildNeighborhood(root, { lite = false } = {}) {
   const asphalt = toon('#8C84A8', { crayon: true });
   const path = toon('#FFE1C6');
   const marking = toon('#FFF4E0');
-  for (const rd of ROADS) {
+  const roads = ROADS.flatMap((rd) => (rd.w > rd.d ? [rd] : splitStrip(rd.x, rd.z, rd.w, rd.d).map(([x, z, w, d]) => ({ ...rd, x, z, w, d }))));
+  for (const rd of roads) {
     B.box(asphalt, rd.x, -0.02, rd.z, rd.w, 0.04, rd.d, { cast: false });
     const along = rd.w > rd.d;
     const len = along ? rd.w : rd.d;
@@ -45,14 +59,14 @@ export function buildNeighborhood(root, { lite = false } = {}) {
     [-44, 18.5, 70, 3], [44, 18.5, 70, 3],
     [-12.5, 6, 10, 6], [12.5, 6, 10, 6],
   ];
-  for (const [x, z, w, d] of paths) B.box(path, x, 0.06, z, w, 0.12, d, { cast: false, outline: 0.02 });
+  for (const [x, z, w, d] of paths.flatMap((p) => splitStrip(...p))) B.box(path, x, 0.06, z, w, 0.12, d, { cast: false, outline: 0.02 });
 
   // background buildings: a row behind each side lane, plus rows across the cross roads
   const lots = [];
   for (const side of [-1, 1]) for (let i = 0; i < 9; i++) lots.push({ x: side * 43, z: 3 - i * 11, w: 13, d: 10 });
   for (let i = 0; i < 5; i++) lots.push({ x: -26 + i * 13, z: 26, w: 11, d: 11 });
   for (let i = 0; i < 5; i++) lots.push({ x: -26 + i * 13, z: -109, w: 11, d: 11 });
-  const use = lite ? lots.filter((_, i) => i % 2 === 0) : lots;
+  const use = (lite ? lots.filter((_, i) => i % 2 === 0) : lots).filter((L) => !blocked(L.x, L.z, L.w / 2, L.d / 2));
 
   const lit = toon('#FFD36E', { key: 'window-lit', emissive: '#FFB43C', emissiveIntensity: 0.9 });
   const dark = toon('#6FA8DC', { key: 'window-dark' });
@@ -88,7 +102,7 @@ export function buildNeighborhood(root, { lite = false } = {}) {
   for (let z = 0; z > -88; z -= 9) spots.push([-21.5, z], [21.5, z]);
   for (let x = -60; x <= 60; x += 12) if (Math.abs(x) > 20) spots.push([x, 18.5]);
   spots.push([-11, 4.5], [11, 4.5], [-14, 7.5], [14, 7.5]);
-  const trees = lite ? spots.filter((_, i) => i % 2 === 0) : spots;
+  const trees = (lite ? spots.filter((_, i) => i % 2 === 0) : spots).filter(([x, z]) => !blocked(x, z, 2, 2));
   for (const [x, z] of trees) {
     const s = 0.85 + r() * 0.4;
     I.add(geo.cyl(8), trunk, matrix(x, 1.3 * s, z, 0.4 * s, 2.6 * s, 0.4 * s), undefined, { outline: 0.03 });
@@ -100,7 +114,7 @@ export function buildNeighborhood(root, { lite = false } = {}) {
   const glow = mat('lamp-glow', { basic: true, color: '#FFE08A', toneMapped: false });
   const lamps = [];
   for (let z = -2; z > -88; z -= 14) lamps.push([-23.8, z], [23.8, z]);
-  for (const [x, z] of lamps) {
+  for (const [x, z] of lamps.filter(([x, z]) => !blocked(x, z))) {
     I.add(geo.cyl(8), pole, matrix(x, 2.4, z, 0.16, 4.8, 0.16), undefined, { outline: 0.02 });
     I.add(geo.sphere(12, 8), glow, matrix(x, 5.0, z, 0.7, 0.7, 0.7));
   }

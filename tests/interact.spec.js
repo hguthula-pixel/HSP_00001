@@ -108,3 +108,39 @@ test('an item can be inspected and put back where it came from', async ({ page }
   const now = await L(page, () => window.__liimy.itemWorld('pottery-0'));
   expect(Math.hypot(now.x - home.x, now.y - home.y, now.z - home.z)).toBeLessThan(0.01);
 });
+
+test('every market shop can be walked into from the street entrance', async ({ page }) => {
+  await enterInteract(page);
+  const result = await page.evaluate(async () => {
+    const m = await import('/js/data/market.js');
+    const { clampToWalk } = await import('/js/data/hawkers.js');
+    // flood fill on a 0.4 m grid, stepping with the real collision
+    const G = 0.4, L = m.LOT, key = (i, j) => `${i},${j}`;
+    const cell = (x, z) => [Math.round((x - L.minX) / G), Math.round((z - L.minZ) / G)];
+    const step = (x, z, tx, tz) => {
+      let p = { x, z };
+      for (let k = 1; k <= 4; k++) p = clampToWalk(p.x + (tx - x) / 4, p.z + (tz - z) / 4);
+      return Math.hypot(p.x - tx, p.z - tz) < 0.12;
+    };
+    const start = cell(-8, -55.6); // forecourt, in front of the entrance
+    const seen = new Set([key(...start)]);
+    const q = [start];
+    while (q.length) {
+      const [i, j] = q.pop();
+      const x = L.minX + i * G, z = L.minZ + j * G;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj, k = key(ni, nj);
+        const nx = L.minX + ni * G, nz = L.minZ + nj * G;
+        if (seen.has(k) || nx > L.maxX || nx < L.minX || nz < L.minZ || nz > L.maxZ) continue;
+        if (step(x, z, nx, nz)) { seen.add(k); q.push([ni, nj]); }
+      }
+    }
+    const unreachable = m.SHOPS.filter((s) => {
+      const [i, j] = cell(s.door[0] - s.nx * 0.6, s.door[1] - s.nz * 0.6);
+      return ![[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => seen.has(key(i + a, j + b)));
+    }).map((s) => s.index);
+    return { shops: m.SHOPS.length, unreachable };
+  });
+  expect(result.shops).toBe(53);
+  expect(result.unreachable).toEqual([]);
+});

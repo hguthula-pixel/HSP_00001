@@ -18,6 +18,13 @@ const REACH = 0.18; // metres from the hand to grab without the beam
  */
 export function registerVR(hooks) {
   const AFRAME = window.AFRAME;
+  let exitBtn = null;
+  const exitPos = new THREE.Vector3();
+  const exitVR = (sceneEl) => {
+    if (sceneEl.is('vr-mode')) sceneEl.exitVR();
+  };
+  /** True when a hand or controller tip is touching the floating Exit VR button. */
+  const touchesExit = (p) => exitBtn && exitBtn.visible && exitBtn.getWorldPosition(exitPos).distanceTo(p) < 0.12;
 
   AFRAME.registerComponent('vr-locomotion', {
     schema: { camera: { type: 'selector' } },
@@ -26,6 +33,27 @@ export function registerVR(hooks) {
       this.turnReady = true;
       this.head = new THREE.Vector3();
       this.dir = new THREE.Vector3();
+      this.yaw = null;
+      exitBtn = makeExitButton();
+      exitBtn.visible = false;
+      this.el.object3D.add(exitBtn);
+    },
+    /** Keeps the Exit VR button floating low in front of the visitor, easing round as they turn. */
+    placeExit() {
+      const rig = this.el.object3D;
+      const cam = this.data.camera.object3D;
+      cam.getWorldPosition(this.head);
+      cam.getWorldDirection(this.dir);
+      let yaw = Math.atan2(this.dir.x, this.dir.z); // camera looks along −dir; this is the yaw of +Z
+      if (this.yaw === null) this.yaw = yaw;
+      let d = yaw - this.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) > 0.6) this.yaw += d * 0.08; // only follow big turns, so it stays put to press
+      const wx = this.head.x - Math.sin(this.yaw) * 0.5;
+      const wz = this.head.z - Math.cos(this.yaw) * 0.5;
+      const local = rig.worldToLocal(new THREE.Vector3(wx, this.head.y - 0.5, wz));
+      exitBtn.position.copy(local);
+      exitBtn.rotation.set(-0.6, this.yaw - rig.rotation.y, 0, 'YXZ');
     },
     setAxes(hand, x, y) {
       if (hand === 'left') {
@@ -46,7 +74,11 @@ export function registerVR(hooks) {
       rig.rotation.y += angle;
     },
     tick(t, dtMs) {
-      if (!this.el.sceneEl.is('vr-mode') || (!this.move.x && !this.move.y) || !hooks.canWalk()) return;
+      const inVR = this.el.sceneEl.is('vr-mode');
+      exitBtn.visible = inVR;
+      if (inVR) this.placeExit();
+      else this.yaw = null;
+      if (!inVR || (!this.move.x && !this.move.y) || !hooks.canWalk()) return;
       const dt = Math.min(dtMs || 16, 100) / 1000;
       const cam = this.data.camera.object3D;
       cam.getWorldDirection(this.dir); // camera looks down −Z; getWorldDirection returns +Z of the object
@@ -123,6 +155,7 @@ export function registerVR(hooks) {
     },
     tryGrab() {
       if (this.held) return;
+      if (touchesExit(this.worldPoint())) return exitVR(this.el.sceneEl);
       const rec = hooks.nearest(this.worldPoint(), REACH);
       if (rec) this.held = hooks.grab(rec, this.anchor, this.data.hand) ? rec : null;
     },
@@ -133,8 +166,11 @@ export function registerVR(hooks) {
       const origin = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
       const dir = new THREE.Vector3(0, 0, -1).transformDirection(o.matrixWorld);
       this.raycaster.set(origin, dir);
-      const hit = this.raycaster.intersectObjects(hooks.targets(), false)[0];
+      const targets = hooks.targets();
+      if (exitBtn && exitBtn.visible) targets.push(exitBtn.userData.hit);
+      const hit = this.raycaster.intersectObjects(targets, false)[0];
       if (!hit) return;
+      if (hit.object.userData.exitVR) return exitVR(this.el.sceneEl);
       const rec = hit.object.userData.pickable;
       if (rec) this.held = hooks.grab(rec, this.anchor, this.data.hand) ? rec : null;
       else hooks.press(hit.object);
@@ -152,4 +188,34 @@ export function registerVR(hooks) {
       else if (start === false) this.drop();
     },
   });
+}
+
+/** A chunky "Exit VR" button in the market's sign style: point and pull the trigger, or touch it. */
+function makeExitButton() {
+  const g = new THREE.Group();
+  g.name = 'vr-exit-button';
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 192;
+  const x = c.getContext('2d');
+  x.fillStyle = '#3A2A3A';
+  x.beginPath();
+  x.roundRect(4, 4, 504, 184, 60);
+  x.fill();
+  x.fillStyle = '#FF8FAB';
+  x.beginPath();
+  x.roundRect(14, 14, 484, 164, 52);
+  x.fill();
+  x.fillStyle = '#FFF4E0';
+  x.font = '600 84px Fredoka, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText('✕  Exit VR', 256, 100);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.075), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
+  face.userData.exitVR = true;
+  g.add(face);
+  g.userData.hit = face;
+  return g;
 }

@@ -4,6 +4,7 @@ import { loadFonts } from './toon.js';
 import { buildStreet } from './street.js';
 import { buildBuildings } from './buildings.js';
 import { buildCarts } from './carts.js';
+import { buildMarket } from './market.js';
 import { buildNeighborhood } from './neighborhood.js';
 import { Lighting } from './lighting.js';
 
@@ -31,6 +32,9 @@ export async function buildWorld(sceneEl, { lite = false, onProgress = () => {} 
   onProgress('shops', 0.65);
   await nextFrame();
   const carts = buildCarts(root);
+  onProgress('market', 0.75);
+  await nextFrame();
+  const market = buildMarket(root); // its items join carts.pickables
   onProgress('town', 0.85);
   await nextFrame();
   const town = buildNeighborhood(root, { lite });
@@ -50,5 +54,5 @@ export async function buildWorld(sceneEl, { lite = false, onProgress = () => {} 
 
   if (renderer.compile) renderer.compile(sceneEl.object3D, sceneEl.camera);
   onProgress('ready', 1);
-  return { root, floor: street.floor, lights: street.lights, hitboxes: carts.hitboxes, pickables: carts.pickables, iceCream: carts.iceCream, lighting, town };
+  return { root, floor: [street.floor, market.floor], market, lights: street.lights, hitboxes: carts.hitboxes, pickables: carts.pickables, iceCream: carts.iceCream, lighting, town };
 }

@@ -24,7 +24,7 @@ test('a slow start times out into recovery, and lite mode loads a lighter town',
   await page.getByRole('button', { name: 'Open lite mode' }).click();
   await expect(page).toHaveURL(/lite=1/);
   await page.waitForFunction(() => window.__liimy && window.__liimy.ready === true, null, { timeout: 90_000 });
-  expect((await page.evaluate(() => window.__liimy.town())).buildings).toBe(14);
+  expect((await page.evaluate(() => window.__liimy.town())).buildings).toBe(11); // 14 lots minus 3 under the market block
 });
 
 test('without WebGL the carts are listed as text', async ({ page }) => {
@@ -53,7 +53,7 @@ test('the market loads only local files, with the town, roads and Fredoka font',
   });
   await openReady(page);
   const town = await page.evaluate(() => window.__liimy.town());
-  expect(town.buildings).toBe(28);
+  expect(town.buildings).toBe(21); // 28 lots minus 7 under the market block
   expect(town.roads).toBe(4);
   expect((await page.evaluate(() => window.__liimy.lighting())).mode).toBe('sunset');
   expect(external).toEqual([]);
